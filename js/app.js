@@ -375,6 +375,12 @@ createApp({
       showFundPanel.value = !showFundPanel.value;
       console.log('[toggleFundPanel] 新状态:', showFundPanel.value);
       if (!chart) { console.warn('[toggleFundPanel] chart未初始化'); return; }
+      // 调整图表容器高度
+      if (!showFundPanel.value) {
+        chartHeight.value = 800;
+      } else {
+        chartHeight.value = 450;
+      }
       try {
         reLayoutPanels();
         if (showFundPanel.value) {
@@ -395,53 +401,119 @@ createApp({
     function reLayoutPanels() {
       if (!chart) return;
       const hf = showFundPanel.value;
-      chart.applyOptions({
-        rightPriceScale: { scaleMargins: hf ? {top:0, bottom:0.60} : {top:0, bottom:0.50} }
-      });
-      if (macdHist) {
-        chart.priceScale('macd').applyOptions({
-          scaleMargins: hf ? {top:0.42, bottom:0.30} : {top:0.52, bottom:0.26}
+      if (hf) {
+        // 基本面面板开启：主图占顶部30%，4个基本面面板各15%
+        chart.applyOptions({
+          rightPriceScale: { scaleMargins: {top:0, bottom:0.70} }
         });
-      }
-      if (rsiSeries) {
-        chart.priceScale('rsi').applyOptions({
-          scaleMargins: hf ? {top:0.55, bottom:0.18} : {top:0.78, bottom:0.02}
+        // PE面板 32%-47%
+        if (fundSeries.pe) {
+          try { chart.priceScale('pe').applyOptions({ scaleMargins:{top:0.32,bottom:0.53} }); } catch(e){}
+        }
+        // PB面板 49%-64%
+        if (fundSeries.pb) {
+          try { chart.priceScale('pb').applyOptions({ scaleMargins:{top:0.49,bottom:0.36} }); } catch(e){}
+        }
+        // ROE面板 66%-81%
+        if (fundSeries.roe) {
+          try { chart.priceScale('roe').applyOptions({ scaleMargins:{top:0.66,bottom:0.19} }); } catch(e){}
+        }
+        // 股息率面板 83%-98%
+        if (fundSeries.dy) {
+          try { chart.priceScale('dy').applyOptions({ scaleMargins:{top:0.83,bottom:0.02} }); } catch(e){}
+        }
+        // MACD/RSI压缩到最底部
+        if (macdHist) {
+          try { chart.priceScale('macd').applyOptions({ scaleMargins:{top:0.90,bottom:0.95} }); } catch(e){}
+        }
+        if (rsiSeries) {
+          try { chart.priceScale('rsi').applyOptions({ scaleMargins:{top:0.93,bottom:0.98} }); } catch(e){}
+        }
+      } else {
+        // 基本面面板关闭：恢复默认布局
+        chart.applyOptions({
+          rightPriceScale: { scaleMargins: {top:0, bottom:0.50} }
         });
+        if (macdHist) {
+          try { chart.priceScale('macd').applyOptions({ scaleMargins:{top:0.52,bottom:0.26} }); } catch(e){}
+        }
+        if (rsiSeries) {
+          try { chart.priceScale('rsi').applyOptions({ scaleMargins:{top:0.78,bottom:0.02} }); } catch(e){}
+        }
       }
     }
     
     function createFundPanelSeries() {
+      console.log('[createFundPanelSeries] 开始创建独立面板');
       removeFundSeries();
-      if (!fundHistory.value?.history?.length) return;
+      if (!fundHistory.value?.history?.length) {
+        console.warn('[createFundPanelSeries] 无数据');
+        return;
+      }
       const h = fundHistory.value.history;
-      // 左侧Y轴: PE(蓝) + PB(红)
-      fundSeries.pe = chart.addSeries(LightweightCharts.LineSeries, {
-        priceScaleId:'fund-left', color:'#2962FF', lineWidth:2,
-        lastValueVisible:false, priceLineVisible:false
-      });
-      fundSeries.pe.setData(h.map(x=>({time:x.date, value:x.pe_ttm})).filter(d=>d.value));
-      fundSeries.pb = chart.addSeries(LightweightCharts.LineSeries, {
-        priceScaleId:'fund-left', color:'#FF6B6B', lineWidth:2,
-        lastValueVisible:false, priceLineVisible:false
-      });
-      fundSeries.pb.setData(h.map(x=>({time:x.date, value:x.pb})).filter(d=>d.value));
-      chart.priceScale('fund-left').applyOptions({
-        scaleMargins:{top:0.72, bottom:0}, borderColor:'#d0d0d0'
-      });
-      // 右侧Y轴: ROE(绿) + 股息率(橙)
-      fundSeries.roe = chart.addSeries(LightweightCharts.LineSeries, {
-        priceScaleId:'fund-right', color:'#26A69A', lineWidth:2,
-        lastValueVisible:false, priceLineVisible:false
-      });
-      fundSeries.roe.setData(h.map(x=>({time:x.date, value:x.roe})).filter(d=>d.value));
-      fundSeries.dy = chart.addSeries(LightweightCharts.LineSeries, {
-        priceScaleId:'fund-right', color:'#FFA726', lineWidth:2,
-        lastValueVisible:false, priceLineVisible:false
-      });
-      fundSeries.dy.setData(h.map(x=>({time:x.date, value:x.dividend_yield})).filter(d=>d.value));
-      chart.priceScale('fund-right').applyOptions({
-        scaleMargins:{top:0.72, bottom:0}, borderColor:'#d0d0d0'
-      });
+      try {
+        // PE面板 (32%-47%)
+        fundSeries.pe = chart.addSeries(LightweightCharts.LineSeries, {
+          priceScaleId: 'pe',
+          color: '#2962FF',
+          lineWidth: 2,
+          lastValueVisible: true,
+          priceLineVisible: false
+        });
+        fundSeries.pe.setData(h.map(x=>({time:x.date, value:x.pe_ttm})).filter(d=>d.value));
+        chart.priceScale('pe').applyOptions({
+          scaleMargins: {top:0.32, bottom:0.53},
+          borderColor: '#d0d0d0'
+        });
+        console.log('[createFundPanelSeries] PE面板已创建');
+        
+        // PB面板 (49%-64%)
+        fundSeries.pb = chart.addSeries(LightweightCharts.LineSeries, {
+          priceScaleId: 'pb',
+          color: '#FF6B6B',
+          lineWidth: 2,
+          lastValueVisible: true,
+          priceLineVisible: false
+        });
+        fundSeries.pb.setData(h.map(x=>({time:x.date, value:x.pb})).filter(d=>d.value));
+        chart.priceScale('pb').applyOptions({
+          scaleMargins: {top:0.49, bottom:0.36},
+          borderColor: '#d0d0d0'
+        });
+        console.log('[createFundPanelSeries] PB面板已创建');
+        
+        // ROE面板 (66%-81%)
+        fundSeries.roe = chart.addSeries(LightweightCharts.LineSeries, {
+          priceScaleId: 'roe',
+          color: '#26A69A',
+          lineWidth: 2,
+          lastValueVisible: true,
+          priceLineVisible: false
+        });
+        fundSeries.roe.setData(h.map(x=>({time:x.date, value:x.roe})).filter(d=>d.value));
+        chart.priceScale('roe').applyOptions({
+          scaleMargins: {top:0.66, bottom:0.19},
+          borderColor: '#d0d0d0'
+        });
+        console.log('[createFundPanelSeries] ROE面板已创建');
+        
+        // 股息率面板 (83%-98%)
+        fundSeries.dy = chart.addSeries(LightweightCharts.LineSeries, {
+          priceScaleId: 'dy',
+          color: '#FFA726',
+          lineWidth: 2,
+          lastValueVisible: true,
+          priceLineVisible: false
+        });
+        fundSeries.dy.setData(h.map(x=>({time:x.date, value:x.dividend_yield})).filter(d=>d.value));
+        chart.priceScale('dy').applyOptions({
+          scaleMargins: {top:0.83, bottom:0.02},
+          borderColor: '#d0d0d0'
+        });
+        console.log('[createFundPanelSeries] 股息率面板已创建');
+      } catch(e) {
+        console.error('[createFundPanelSeries] 错误:', e);
+      }
     }
     
     function removeFundSeries() {
