@@ -814,9 +814,7 @@ createApp({
             layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
             grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
             rightPriceScale: { borderColor:'#d0d0d0' },
-            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{
-              const d=new Date(time*1000);return (d.getMonth()+1)+'/'+d.getDate();
-            }},
+            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{if(typeof time==='string'){const p=time.split('-');return parseInt(p[1])+'月';}const d=new Date(time*1000);return (d.getMonth()+1)+'月';}},
             crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
           });
           const peData = history.map(h => ({ time: h.date, value: h.pe_ttm || null })).filter(d => d.value);
@@ -849,9 +847,7 @@ createApp({
             layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
             grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
             rightPriceScale: { borderColor:'#d0d0d0' },
-            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{
-              const d=new Date(time*1000);return (d.getMonth()+1)+'/'+d.getDate();
-            }},
+            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{if(typeof time==='string'){const p=time.split('-');return parseInt(p[1])+'月';}const d=new Date(time*1000);return (d.getMonth()+1)+'月';}},
             crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
           });
           const pbData = history.map(h => ({ time: h.date, value: h.pb || null })).filter(d => d.value);
@@ -883,9 +879,7 @@ createApp({
             layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
             grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
             rightPriceScale: { borderColor:'#d0d0d0' },
-            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{
-              const d=new Date(time*1000);return (d.getMonth()+1)+'/'+d.getDate();
-            }},
+            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{if(typeof time==='string'){const p=time.split('-');return parseInt(p[1])+'月';}const d=new Date(time*1000);return (d.getMonth()+1)+'月';}},
             crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
           });
           const roeData = history.map(h => ({ time: h.date, value: h.roe || null })).filter(d => d.value);
@@ -917,9 +911,7 @@ createApp({
             layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
             grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
             rightPriceScale: { borderColor:'#d0d0d0' },
-            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{
-              const d=new Date(time*1000);return (d.getMonth()+1)+'/'+d.getDate();
-            }},
+            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{if(typeof time==='string'){const p=time.split('-');return parseInt(p[1])+'月';}const d=new Date(time*1000);return (d.getMonth()+1)+'月';}},
             crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
           });
           const dyData = history.map(h => ({ time: h.date, value: h.dividend_yield || null })).filter(d => d.value);
@@ -947,22 +939,31 @@ createApp({
 
     function renderPercentileChart() {
       const container = document.getElementById('percentile-chart');
-      if (!container || !fundHistory.value) return;
-      const history = fundHistory.value.history;
-      const latest = history[history.length - 1];
-      if (!latest) return;
+      if (!container || !fundHistory.value || !fundHistory.value.current) return;
+      const current = fundHistory.value.current;
       const indicators = [
-        { key: 'pe_ttm', label: 'PE(TTM)', value: latest.pe_ttm, color: '#2962FF' },
-        { key: 'pb', label: 'PB', value: latest.pb, color: '#FF6B6B' },
-        { key: 'roe', label: 'ROE', value: latest.roe, color: '#26A69A' },
-        { key: 'dividend_yield', label: '股息率', value: latest.dividend_yield, color: '#FFA726' }
+        { key: 'pe_ttm', label: 'PE(TTM)', value: current.pe_ttm, pct: current.pe_percentile, color: '#2962FF' },
+        { key: 'pb', label: 'PB', value: current.pb, pct: current.pb_percentile, color: '#FF6B6B' },
+        { key: 'roe', label: 'ROE', value: current.roe, pct: current.roe_percentile, color: '#26A69A' },
+        { key: 'dy', label: '股息率', value: current.dividend_yield, pct: current.dividend_yield_percentile, color: '#FFA726' }
       ];
-      let html = '<div style="padding:10px;">';
+      let html = '<div style=padding:10px;><h4 style=font-size:14px;margin-bottom:12px;color:#333;>历史分位数</h4>';
       for (const ind of indicators) {
-        const values = history.map(h => h[ind.key]).filter(v => v != null);
-        const percentile = calcPercentile(values, ind.value);
-        const color = percentile < 30 ? '#4CAF50' : percentile < 70 ? '#FFC107' : '#F44336';
-        html += `<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:13px;font-weight:600;">${ind.label}</span><span style="font-size:13px;color:${color};font-weight:700;">${ind.value?.toFixed(2)} (${percentile.toFixed(1)}%)</span></div><div style="height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden;"><div style="height:100%;width:${percentile}%;background:linear-gradient(90deg,#4CAF50,#FFC107,#F44336);border-radius:4px;"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#888;margin-top:2px;"><span>低估(0-30%)</span><span>合理(30-70%)</span><span>高估(70-100%)</span></div></div>`;
+        if (ind.value == null) continue;
+        const pct = (ind.pct != null) ? ind.pct : 50;
+        const color = pct < 30 ? '#16a34a' : pct < 70 ? '#ca8a04' : '#dc2626';
+        const bgColor = pct < 30 ? '#f0fdf4' : pct < 70 ? '#fefce8' : '#fef2f2';
+        const valStr = typeof ind.value === 'number' ? ind.value.toFixed(2) : ind.value;
+        html += '<div style=margin-bottom:14px;padding:10px 12px;background:' + bgColor + ';border-radius:10px;border:1px solid ' + color + '22;>'
+          + '<div style=display:flex;justify-content:space-between;margin-bottom:6px;>'
+          + '<span style=font-size:13px;font-weight:600;color:#333;>' + ind.label + '</span>'
+          + '<span style=font-size:13px;color:' + color + ';font-weight:700;>' + valStr + ' (' + pct.toFixed(1) + '%)</span></div>'
+          + '<div style=height:10px;background:#e0e0e0;border-radius:5px;overflow:hidden;position:relative;>'
+          + '<div style=height:100%;width:' + pct + '%;background:linear-gradient(90deg,#16a34a,#ca8a04,#dc2626);border-radius:5px;transition:width 0.6s ease;></div>'
+          + '<div style=position:absolute;top:-2px;left:30%;width:2px;height:14px;background:rgba(0,0,0,0.12);border-radius:1px;></div>'
+          + '<div style=position:absolute;top:-2px;left:70%;width:2px;height:14px;background:rgba(0,0,0,0.12);border-radius:1px;></div></div>'
+          + '<div style=display:flex;justify-content:space-between;font-size:10px;color:#999;margin-top:3px;>'
+          + '<span>低估<br>0-30%</span><span>合理<br>30-70%</span><span>高估<br>70-100%</span></div></div>';
       }
       html += '</div>';
       container.innerHTML = html;
@@ -972,6 +973,15 @@ createApp({
       activeMainTab.value = 'fundamental';
       if (stockCode.value) {
         await loadFundamentalHistory(stockCode.value);
+      }
+      // 窗口resize时自动调整图表宽度
+      if (!window._fundResizeHandler) {
+        window._fundResizeHandler = () => {
+          if (activeMainTab.value === 'fundamental' && fundHistory.value) {
+            renderFundamentalCharts();
+          }
+        };
+        window.addEventListener('resize', window._fundResizeHandler);
       }
     }
 
