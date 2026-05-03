@@ -66,7 +66,8 @@ createApp({
     let macdHist = null, macdDif = null, macdDea = null;
     let rsiSeries = null;
     let equityChart = null;
-    let fundChart = null;
+    let fundamentalTrendChart = null;  // 基本面趋势图
+    const fundHistory = ref(null);
 
     // =========== 股票搜索 ===========
     const searchQuery = ref('');
@@ -725,12 +726,9 @@ createApp({
       return v + '元';
     }
 
-    // =========== 基本面数据可视化 ===========
-    let fundHistory = ref(null);      // 基本面历史数据
-    let fundChart = null;           // 基本面图表实例
-    let percentileChart = null;     // 分位图实例
+    // =========== 生命周期 ===========
 
-    // 加载基本面历史数据
+    // =========== 基本面数据可视化 ===========
     async function loadFundamentalHistory(code) {
       try {
         const url = `data/fundamentals/${code}_history.json`;
@@ -744,7 +742,6 @@ createApp({
       }
     }
 
-    // 计算百分位
     function calcPercentile(arr, value) {
       const sorted = arr.filter(v => v != null && isFinite(v)).sort((a,b) => a-b);
       if (sorted.length === 0) return 50;
@@ -758,94 +755,60 @@ createApp({
       return (count / sorted.length) * 100;
     }
 
-    // 渲染基本面图表（对标理杏仁）
     function renderFundamentalCharts() {
       if (!fundHistory.value || fundHistory.value.history.length === 0) return;
-      
       nextTick(() => {
-        // 1. 指标历史走势图（PE/PB/ROE/股息率）
         const trendEl = document.getElementById('fund-trend-chart');
-        if (trendEl && fundChart) { fundChart.remove(); fundChart = null; }
-        
+        if (trendEl && fundamentalTrendChart) { fundamentalTrendChart.remove(); fundamentalTrendChart = null; }
         if (trendEl) {
-          fundChart = LightweightCharts.createChart(trendEl, {
-            width: trendEl.clientWidth,
-            height: 300,
+          fundamentalTrendChart = LightweightCharts.createChart(trendEl, {
+            width: trendEl.clientWidth, height: 300,
             layout:{background:{type:'solid',color:'#fff'},textColor:'#333'},
             grid:{vertLines:{color:'#f0f0f0'},horzLines:{color:'#f0f0f0'}},
           });
-          
           const history = fundHistory.value.history;
-          const dates = history.map(h => h.date);
-          
-          // PE走势
           const peData = history.map(h => ({ time: h.date, value: h.pe_ttm || null }));
-          const peSeries = fundChart.addSeries(LightweightCharts.LineSeries, { color:'#2962FF', lineWidth:2, title:'PE(TTM)' });
+          const peSeries = fundamentalTrendChart.addSeries(LightweightCharts.LineSeries, { color:'#2962FF', lineWidth:2, title:'PE(TTM)' });
           peSeries.setData(peData.filter(d => d.value));
-          
-          // PB走势
           const pbData = history.map(h => ({ time: h.date, value: h.pb || null }));
-          const pbSeries = fundChart.addSeries(LightweightCharts.LineSeries, { color:'#FF6B6B', lineWidth:2, title:'PB' });
+          const pbSeries = fundamentalTrendChart.addSeries(LightweightCharts.LineSeries, { color:'#FF6B6B', lineWidth:2, title:'PB' });
           pbSeries.setData(pbData.filter(d => d.value));
-          
-          fundChart.timeScale().fitContent();
+          fundamentalTrendChart.timeScale().fitContent();
         }
-        
-        // 2. 分位图（理杏仁经典）
         renderPercentileChart();
       });
     }
 
-    // 渲染分位图
     function renderPercentileChart() {
       const container = document.getElementById('percentile-chart');
       if (!container || !fundHistory.value) return;
-      
       const history = fundHistory.value.history;
       const latest = history[history.length - 1];
       if (!latest) return;
-      
-      // 计算各指标百分位
       const indicators = [
         { key: 'pe_ttm', label: 'PE(TTM)', value: latest.pe_ttm, color: '#2962FF' },
         { key: 'pb', label: 'PB', value: latest.pb, color: '#FF6B6B' },
         { key: 'roe', label: 'ROE', value: latest.roe, color: '#26A69A' },
         { key: 'dividend_yield', label: '股息率', value: latest.dividend_yield, color: '#FFA726' }
       ];
-      
       let html = '<div style="padding:10px;">';
       for (const ind of indicators) {
         const values = history.map(h => h[ind.key]).filter(v => v != null);
         const percentile = calcPercentile(values, ind.value);
         const color = percentile < 30 ? '#4CAF50' : percentile < 70 ? '#FFC107' : '#F44336';
-        
-        html += `
-          <div style="margin-bottom:12px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="font-size:13px;font-weight:600;">${ind.label}</span>
-              <span style="font-size:13px;color:${color};font-weight:700;">${ind.value?.toFixed(2)} (${percentile.toFixed(1)}%)</span>
-            </div>
-            <div style="height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden;">
-              <div style="height:100%;width:${percentile}%;background:linear-gradient(90deg,#4CAF50,#FFC107,#F44336);border-radius:4px;"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;color:#888;margin-top:2px;">
-              <span>低估(0-30%)</span><span>合理(30-70%)</span><span>高估(70-100%)</span>
-            </div>
-          </div>
-        `;
+        html += `<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:13px;font-weight:600;">${ind.label}</span><span style="font-size:13px;color:${color};font-weight:700;">${ind.value?.toFixed(2)} (${percentile.toFixed(1)}%)</span></div><div style="height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden;"><div style="height:100%;width:${percentile}%;background:linear-gradient(90deg,#4CAF50,#FFC107,#F44336);border-radius:4px;"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#888;margin-top:2px;"><span>低估(0-30%)</span><span>合理(30-70%)</span><span>高估(70-100%)</span></div></div>`;
       }
       html += '</div>';
-      
       container.innerHTML = html;
     }
 
-    // 显示基本面面板
     async function showFundamental() {
       activeMainTab.value = 'fundamental';
       if (stockCode.value) {
         await loadFundamentalHistory(stockCode.value);
       }
     }
+
     onMounted(async () => {
       initChart();
       // 加载股票列表
@@ -865,8 +828,7 @@ createApp({
       stockCode, activeMainTab, quote, quoteSource, period, chartHeight,
       indicators, periods, mainTabs, useLogScale,
       btStrategy, btCapital, btParam, btResult,
-      fundamentalList, activeFund,
-      fundHistory,
+      fundamentalList, fundHistory, activeFund,
       searchQuery, searchResults, onSearchInput, selectStock,
       updateTimer, startRealtime, stopRealtime,
       showLog, toggleLog,
