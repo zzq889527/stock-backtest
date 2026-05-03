@@ -274,7 +274,16 @@
     <div class="quote-grid">
       <div class="quote-item">
         <div class="quote-label">股票</div>
-        <div class="quote-value" style="font-size:14px;">{{ quote.name }} <span style="color:#888;font-size:12px;">{{ stockCode }}</span></div>
+        <div class="quote-value" style="font-size:14px;">
+          {{ quote.name }} 
+          <span style="color:#888;font-size:12px;">{{ stockCode }}</span>
+          <span v-if="quoteSource" style="font-size:11px;background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;margin-left:6px;">
+            {{ quoteSource }}
+          </span>
+          <span v-else style="font-size:11px;background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:4px;margin-left:6px;">
+            离线
+          </span>
+        </div>
       </div>
       <div class="quote-item">
         <div class="quote-label">最新价</div>

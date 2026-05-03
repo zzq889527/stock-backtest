@@ -28,6 +28,7 @@ createApp({
       { key:'boll', label:'BOLL', on:false },
     ]);
     const useLogScale = ref(false);
+    const quoteSource = ref('');      // 行情来源：''/ '实时' / '代理'
 
     const periods = [
       { v:'daily',  l:'日线' },
@@ -442,23 +443,31 @@ createApp({
     // 带CORS代理兜底的行情获取
     async function fetchQuoteText(code) {
       const url = `https://hq.sinajs.cn/list=${code}`;
-      // 第1层：直连
+      // 第1层：直连（本地/同源可能成功）
       try {
-        const resp = await fetch(url);
+        const resp = await fetch(url, { mode: 'cors', credentials: 'omit' });
         if (resp.ok) {
           const q = parseSinajsText(await resp.text());
-          if (q) return q;
+          if (q) { quoteSource.value = '实时'; return q; }
         }
-      } catch(e) { /* 降级到代理 */ }
-      // 第2层：CORS代理
-      try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-        const resp = await fetch(proxyUrl);
-        if (resp.ok) {
-          const q = parseSinajsText(await resp.text());
-          if (q) return q;
-        }
-      } catch(e) { /* 全部失败 */ }
+      } catch(e) { /* 预期失败，静默处理 */ }
+      // 第2层：CORS代理（只保留较稳定的）
+      const proxies = [
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      ];
+      for (const proxyUrl of proxies) {
+        try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 3000);
+          const resp = await fetch(proxyUrl, { signal: controller.signal });
+          clearTimeout(tid);
+          if (resp.ok) {
+            const q = parseSinajsText(await resp.text());
+            if (q) { quoteSource.value = '代理'; return q; }
+          }
+        } catch(e) { continue; }
+      }
+      quoteSource.value = '';  // 标记为无实时数据
       return null;
     }
 
@@ -488,7 +497,13 @@ createApp({
 
         // 2. 获取实时行情
         const q = await fetchQuoteText(code);
-        quote.value = q || makeFallbackQuote(klineData, code);
+        if (q) {
+          quote.value = q;
+        } else {
+          // 所有接口都失败，使用K线最后一天作为行情
+          quote.value = makeFallbackQuote(klineData, code);
+          quoteSource.value = '回退';  // 标记为回退数据
+        }
 
         renderChart();
       } catch(e) {
