@@ -42,7 +42,7 @@ createApp({
 
     // 回测
     const btStrategy = ref('dualMA');
-    const btCapital = ref(100000);
+    const btCapital = ref(1000000);
     const btParam = ref({ short:5, long:20 });
     const btResult = ref(null);
 
@@ -408,6 +408,63 @@ createApp({
     }
 
     // =========== 获取实时行情 ===========
+    // 解析新浪行情文本
+    function parseSinajsText(text) {
+      const m = text.match(/="(.+)";/);
+      if (!m || !m[1]) return null;
+      const p = m[1].split(',');
+      if (p.length < 4) return null;
+      const close = parseFloat(p[2]) || 0;
+      const cur = parseFloat(p[3]) || 0;
+      return {
+        name: p[0],
+        price: cur.toFixed(2),
+        change: (cur - close).toFixed(2),
+        pct: close ? ((cur - close) / close * 100).toFixed(2) : '0.00',
+        vol: parseInt(p[8]) || 0,
+        amt: parseFloat(p[9]) || 0,
+        time: (p[30] || '') + ' ' + (p[31] || ''),
+      };
+    }
+
+    // 带CORS代理兜底的行情获取
+    async function fetchQuoteText(code) {
+      const url = `https://hq.sinajs.cn/list=${code}`;
+      // 第1层：直连
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const q = parseSinajsText(await resp.text());
+          if (q) return q;
+        }
+      } catch(e) { /* 降级到代理 */ }
+      // 第2层：CORS代理
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        const resp = await fetch(proxyUrl);
+        if (resp.ok) {
+          const q = parseSinajsText(await resp.text());
+          if (q) return q;
+        }
+      } catch(e) { /* 全部失败 */ }
+      return null;
+    }
+
+    // 从K线最后一天生成回退行情
+    function makeFallbackQuote(klineData, code) {
+      const last = klineData[klineData.length - 1];
+      const found = stockList.value.find(s => s.code === code);
+      return {
+        name: found ? found.name : code,
+        price: last.close.toFixed(2),
+        change: '0.00',
+        pct: '0.00',
+        vol: last.volume,
+        amt: last.close * last.volume,
+        time: last.time,
+      };
+    }
+
     async function loadStock() {
       const code = stockCode.value.trim();
       if (!code) return;
@@ -417,41 +474,9 @@ createApp({
         klineData = await fetchKline(code, 300);
         console.log(`[loadStock] K线数据加载成功: ${klineData.length}条`);
 
-        // 2. 获取实时行情（新浪接口）
-        try {
-          const resp = await fetch(`https://hq.sinajs.cn/list=${code}`);
-          const text = await resp.text();
-          const m = text.match(/="(.+)";/);
-          if (m && m[1]) {
-            const p = m[1].split(',');
-            if (p.length > 30) {
-              const close = parseFloat(p[2]) || 0;
-              const cur  = parseFloat(p[3]) || 0;
-              quote.value = {
-                name: p[0],
-                price: cur.toFixed(2),
-                change: (cur - close).toFixed(2),
-                pct: close ? ((cur - close) / close * 100).toFixed(2) : '0.00',
-                vol: parseInt(p[8]) || 0,
-                amt: parseFloat(p[9]) || 0,
-                time: (p[30] || '') + ' ' + (p[31] || ''),
-              };
-            }
-          }
-        } catch(e) {
-          console.warn('实时行情获取失败，使用K线最后价格', e);
-          const last = klineData[klineData.length - 1];
-          const found = stockList.value.find(s => s.code === code);
-          quote.value = {
-            name: found ? found.name : code,
-            price: last.close.toFixed(2),
-            change: '0.00',
-            pct: '0.00',
-            vol: last.volume,
-            amt: last.close * last.volume,
-            time: last.time,
-          };
-        }
+        // 2. 获取实时行情
+        const q = await fetchQuoteText(code);
+        quote.value = q || makeFallbackQuote(klineData, code);
 
         renderChart();
       } catch(e) {
@@ -648,28 +673,9 @@ createApp({
     async function updateRealtime() {
       const code = stockCode.value.trim();
       if (!code || !quote.value) return;
-      try {
-        const resp = await fetch(`https://hq.sinajs.cn/list=${code}`);
-        const text = await resp.text();
-        const m = text.match(/="(.+)";/);
-        if (m && m[1]) {
-          const p = m[1].split(',');
-          if (p.length > 3) {
-            const close = parseFloat(p[2]) || 0;
-            const cur  = parseFloat(p[3]) || 0;
-            quote.value = {
-              ...quote.value,
-              price: cur.toFixed(2),
-              change: (cur - close).toFixed(2),
-              pct: close ? ((cur - close) / close * 100).toFixed(2) : '0.00',
-              vol: parseInt(p[8]) || 0,
-              amt: parseFloat(p[9]) || 0,
-              time: (p[30] || '') + ' ' + (p[31] || ''),
-            };
-          }
-        }
-      } catch(e) { 
-        console.warn('实时更新失败', e); 
+      const q = await fetchQuoteText(code);
+      if (q) {
+        quote.value = { ...quote.value, ...q };
       }
     }
 

@@ -45,7 +45,7 @@ class BacktestEngine {
       if (signal === 'buy' && position === 0) {
         // 买入
         const price = bar.close * (1 + slippage);
-        const maxShares = Math.floor(cash / price / 100) * 100; // 整手
+        const maxShares = Math.floor(cash / price); // 回测模拟，不强制整手
         if (maxShares > 0) {
           const cost = maxShares * price * (1 + commission);
           cash -= cost;
