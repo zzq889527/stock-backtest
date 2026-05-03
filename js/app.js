@@ -7,7 +7,7 @@ const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
 createApp({
   setup() {
     // =========== 状态 ===========
-    const stockCode = ref('sh600000');
+    const stockCode = ref('sh600519');  // 默认茅台，已有本地K线数据
     const activeMainTab = ref('chart');
     const quote = ref(null);
     const period = ref('daily');
