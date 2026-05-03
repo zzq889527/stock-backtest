@@ -27,6 +27,7 @@ createApp({
       { key:'rsi',  label:'RSI',  on:false },
       { key:'boll', label:'BOLL', on:false },
     ]);
+    const useLogScale = ref(false);
 
     const periods = [
       { v:'daily',  l:'日线' },
@@ -342,6 +343,17 @@ createApp({
       const item = indicators.value.find(i => i.key === key);
       if (item) { item.on = !item.on; }
       renderChart();
+    }
+
+    function toggleLogScale() {
+      useLogScale.value = !useLogScale.value;
+      if (chart) {
+        chart.applyOptions({
+          rightPriceScale: {
+            mode: useLogScale.value ? LightweightCharts.PriceScaleMode.Logarithmic : LightweightCharts.PriceScaleMode.Normal,
+          }
+        });
+      }
     }
 
     // =========== 获取K线数据 ===========
@@ -716,13 +728,13 @@ createApp({
 
     return {
       stockCode, activeMainTab, quote, period, chartHeight,
-      indicators, periods, mainTabs,
+      indicators, periods, mainTabs, useLogScale,
       btStrategy, btCapital, btParam, btResult,
       fundamentalList, activeFund,
       searchQuery, searchResults, onSearchInput, selectStock,
       updateTimer, startRealtime, stopRealtime,
       showLog, toggleLog,
-      loadStock, toggleIndicator, runBacktest, showFundamental,
+      loadStock, toggleIndicator, toggleLogScale, runBacktest, showFundamental,
       fmtVol, fmtAmt,
     };
   }

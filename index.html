@@ -302,13 +302,20 @@
 
     <!-- K线图 -->
     <div v-show="activeMainTab==='chart'">
-      <div id="kline-chart"></div>
+      <div style="position:relative;">
+        <div id="kline-chart"></div>
+        <!-- 副图面板标题 -->
+        <div style="position:absolute;left:8px;top:52%;font-size:11px;color:#888;pointer-events:none;font-weight:600;background:rgba(255,255,255,0.8);padding:1px 6px;border-radius:4px;" v-show="indicators.find(i=>i.key==='macd'&&i.on)">MACD</div>
+        <div style="position:absolute;left:8px;top:78%;font-size:11px;color:#888;pointer-events:none;font-weight:600;background:rgba(255,255,255,0.8);padding:1px 6px;border-radius:4px;" v-show="indicators.find(i=>i.key==='rsi'&&i.on)">RSI</div>
+      </div>
       <div class="indicator-bar">
         <button v-for="ind in indicators" :key="ind.key"
                 class="indicator-btn" :class="{active: ind.on}"
                 @click="toggleIndicator(ind.key)">
           {{ ind.label }}
         </button>
+        <button class="indicator-btn" :class="{active: useLogScale}"
+                @click="toggleLogScale" style="margin-left:auto;">📐 对数</button>
       </div>
     </div>
 
