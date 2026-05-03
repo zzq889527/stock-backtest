@@ -3,8 +3,8 @@
  * 依赖: lightweight-charts, Vue3, Indicators, BacktestEngine
  * 
  * Lightweight Charts v5.0.6 API:
- *   chart.addSeries(type, options)
- *   type: 0=Line, 2=Candlestick, 3=Histogram
+ *   chart.addSeries(SeriesConstructor, options)
+ *   SeriesConstructor: LightweightCharts.CandlestickSeries / LineSeries / HistogramSeries
  */
 
 const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
@@ -165,9 +165,9 @@ createApp({
           },
         });
 
-        // K线 - v5.0.6 API: addSeries(type, options)
-        // type: 0=Line, 2=Candlestick, 3=Histogram
-        candleSeries = chart.addSeries(2, {
+        // K线 - v5.0.6 API: addSeries(SeriesConstructor, options)
+        // LightweightCharts.CandlestickSeries
+        candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
           upColor:'#ef5350', 
           downColor:'#26a69a',
           borderVisible:false,
@@ -176,7 +176,7 @@ createApp({
         });
 
         // 成交量 - Histogram
-        volumeSeries = chart.addSeries(3, {
+        volumeSeries = chart.addSeries(LightweightCharts.HistogramSeries, {
           priceFormat: { type:'volume' }, 
           priceScaleId: '', 
           scaleMargins: { top:0.8, bottom:0 },
@@ -251,10 +251,10 @@ createApp({
       const ma20 = ind.SMA(closes, 20);
 
       if (!ma5Series) {
-        // v5.0.6 API: addSeries(0, {...}) = Line series
-        ma5Series  = chart.addSeries(0, { color:'#f6c000', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
-        ma10Series = chart.addSeries(0, { color:'#e040fb', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
-        ma20Series = chart.addSeries(0, { color:'#00bcd4', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+        // v5.0.6 API: addSeries(LineSeries, {...})
+        ma5Series  = chart.addSeries(LightweightCharts.LineSeries, { color:'#f6c000', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+        ma10Series = chart.addSeries(LightweightCharts.LineSeries, { color:'#e040fb', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+        ma20Series = chart.addSeries(LightweightCharts.LineSeries, { color:'#00bcd4', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
       }
       
       ma5Series.setData(klineData.map((d,i) => ({time:d.time, value:ma5[i]})));
@@ -270,13 +270,13 @@ createApp({
     function renderMACD(closes) {
       if (!macdHist) {
         // MACD 直方图 - Histogram series
-        macdHist = chart.addSeries(3, {
+        macdHist = chart.addSeries(LightweightCharts.HistogramSeries, {
           priceScaleId: 'macd',
           scaleMargins: { top:0.7, bottom:0 },
         });
         
         // MACD 线 - Line series
-        macdDif = chart.addSeries(0, { 
+        macdDif = chart.addSeries(LightweightCharts.LineSeries, { 
           priceScaleId:'macd', 
           color:'#f6c000', 
           lineWidth:1, 
@@ -284,7 +284,7 @@ createApp({
           priceLineVisible:false 
         });
         
-        macdDea = chart.addSeries(0, { 
+        macdDea = chart.addSeries(LightweightCharts.LineSeries, { 
           priceScaleId:'macd', 
           color:'#e040fb', 
           lineWidth:1, 
@@ -309,7 +309,7 @@ createApp({
 
     function renderRSI(closes) {
       if (!rsiSeries) {
-        rsiSeries = chart.addSeries(0, {
+        rsiSeries = chart.addSeries(LightweightCharts.LineSeries, {
           priceScaleId: 'rsi',
           color:'#ff9800', 
           lineWidth:1,
@@ -325,9 +325,9 @@ createApp({
 
     function renderBOLL(closes) {
       if (!bollUpper) {
-        bollUpper  = chart.addSeries(0, { color:'#9c27b0', lineWidth:1, lastValueVisible:false, priceLineVisible:false });
-        bollMiddle = chart.addSeries(0, { color:'#2196f3', lineWidth:1, lastValueVisible:false, priceLineVisible:false });
-        bollLower  = chart.addSeries(0, { color:'#9c27b0', lineWidth:1, lastValueVisible:false, priceLineVisible:false });
+        bollUpper  = chart.addSeries(LightweightCharts.LineSeries, { color:'#9c27b0', lineWidth:1, lastValueVisible:false, priceLineVisible:false });
+        bollMiddle = chart.addSeries(LightweightCharts.LineSeries, { color:'#2196f3', lineWidth:1, lastValueVisible:false, priceLineVisible:false });
+        bollLower  = chart.addSeries(LightweightCharts.LineSeries, { color:'#9c27b0', lineWidth:1, lastValueVisible:false, priceLineVisible:false });
       }
       
       const { upper, middle, lower } = Indicators.BOLL(closes, 20, 2);
@@ -506,7 +506,7 @@ createApp({
           grid:{vertLines:{color:'#f0f0f0'},horzLines:{color:'#f0f0f0'}},
         });
         
-        const s = equityChart.addSeries(0, { color:'#2563eb', lineWidth:2 });
+        const s = equityChart.addSeries(LightweightCharts.LineSeries, { color:'#2563eb', lineWidth:2 });
         s.setData(result.equityCurve);
         equityChart.timeScale().fitContent();
       });
@@ -551,7 +551,7 @@ createApp({
           grid:{vertLines:{color:'#f0f0f0'},horzLines:{color:'#f0f0f0'}},
         });
         
-        const s = fundChart.addSeries(0, { color:'#16a34a', lineWidth:2 });
+        const s = fundChart.addSeries(LightweightCharts.LineSeries, { color:'#16a34a', lineWidth:2 });
         s.setData(history);
         fundChart.timeScale().fitContent();
 
