@@ -1,0 +1,15 @@
+{
+  "code": "sh600000",
+  "name": "浦发银行",
+  "update_time": "2026-05-03",
+  "history": [
+    {"date": "2023-03-31", "pe_ttm": 4.8, "pb": 0.42, "ps_ttm": 1.2, "dividend_yield": 5.2, "roe": 8.5, "roa": 0.85, "gross_margin": 0.0, "net_margin": 25.8},
+    {"date": "2023-06-30", "pe_ttm": 4.5, "pb": 0.40, "ps_ttm": 1.1, "dividend_yield": 5.5, "roe": 8.2, "roa": 0.82, "gross_margin": 0.0, "net_margin": 25.2},
+    {"date": "2023-09-30", "pe_ttm": 4.2, "pb": 0.38, "ps_ttm": 1.0, "dividend_yield": 5.8, "roe": 7.9, "roa": 0.80, "gross_margin": 0.0, "net_margin": 24.8},
+    {"date": "2023-12-31", "pe_ttm": 3.9, "pb": 0.36, "ps_ttm": 0.9, "dividend_yield": 6.2, "roe": 7.5, "roa": 0.78, "gross_margin": 0.0, "net_margin": 24.2},
+    {"date": "2024-03-31", "pe_ttm": 4.1, "pb": 0.37, "ps_ttm": 1.0, "dividend_yield": 5.9, "roe": 7.8, "roa": 0.80, "gross_margin": 0.0, "net_margin": 24.5},
+    {"date": "2024-06-30", "pe_ttm": 4.3, "pb": 0.39, "ps_ttm": 1.1, "dividend_yield": 5.6, "roe": 8.0, "roa": 0.82, "gross_margin": 0.0, "net_margin": 25.0},
+    {"date": "2024-09-30", "pe_ttm": 4.6, "pb": 0.41, "ps_ttm": 1.2, "dividend_yield": 5.3, "roe": 8.3, "roa": 0.85, "gross_margin": 0.0, "net_margin": 25.5},
+    {"date": "2024-12-31", "pe_ttm": 4.9, "pb": 0.43, "ps_ttm": 1.2, "dividend_yield": 5.1, "roe": 8.6, "roa": 0.87, "gross_margin": 0.0, "net_margin": 26.0}
+  ]
+}

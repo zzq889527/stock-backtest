@@ -306,7 +306,7 @@
     <div class="tab-bar">
       <button :class="{active: activeMainTab==='chart'}" @click="activeMainTab='chart'">📊 K线图</button>
       <button :class="{active: activeMainTab==='backtest'}" @click="activeMainTab='backtest'">🎯 回测</button>
-      <button :class="{active: activeMainTab==='fundamental'}" @click="activeMainTab='fundamental'">📈 基本面</button>
+      <button :class="{active: activeMainTab==='fundamental'}" @click="activeMainTab='fundamental'; showFundamental()">📈 基本面</button>
     </div>
 
     <!-- K线图 -->
@@ -406,8 +406,13 @@
     <!-- 基本面 -->
     <div v-show="activeMainTab==='fundamental'">
       <h3 style="margin-bottom:12px;font-size:16px;">📈 基本面数据</h3>
-      <div class="fund-grid">
-        <div class="fund-card" v-for="f in fundamentalList" :key="f.key" @click="showFundamental(f.key)">
+      <!-- 指标历史走势图 -->
+      <div id="fund-trend-chart" style="height:300px;"></div>
+      <!-- 分位图（理杏仁风格） -->
+      <div id="percentile-chart" style="margin-top:16px;"></div>
+      <!-- 基本面卡片 -->
+      <div class="fund-grid" style="margin-top:16px;">
+        <div class="fund-card" v-for="f in fundamentalList" :key="f.key" @click="activeFund=f.key">
           <div class="fund-label">{{ f.label }}</div>
           <div class="fund-value">{{ f.value }}</div>
           <div class="fund-pct" :style="{color: f.percentile<=30?'#16a34a':f.percentile>=70?'#dc2626':'#ca8a04'}">
@@ -415,9 +420,6 @@
           </div>
         </div>
       </div>
-      <div id="fund-chart" style="height:300px;"></div>
-      <div id="fund-pct-bar" style="margin-top:16px;"></div>
-      <canvas id="fund-radar" width="300" height="300" style="display:block;margin:20px auto;"></canvas>
     </div>
   </div>
 
