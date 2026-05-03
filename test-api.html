@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>测试 Lightweight Charts API</title>
+  <script src="https://unpkg.com/lightweight-charts@5.0.6/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+    #chart { width: 100%; height: 300px; border: 1px solid #ccc; background: #fff; }
+    .log { background: #000; color: #0f0; padding: 10px; margin-top: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; }
+    .success { color: #0f0; }
+    .error { color: #f00; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Lightweight Charts v5.0.6 API 测试</h1>
+  
+  <div>
+    <button onclick="testAddSeriesWithNumber()">测试 addSeries(数字, options)</button>
+    <button onclick="testAddSeriesWithObject()">测试 addSeries({type}, options)</button>
+    <button onclick="testAddLineSeries()">测试 addLineSeries(options)</button>
+    <button onclick="clearLog()">清空日志</button>
+  </div>
+
+  <div id="chart"></div>
+  <div class="log" id="log"></div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    
+    function clearLog() {
+      logEl.innerHTML = '';
+    }
+    
+    function addLog(msg, isError = false) {
+      const div = document.createElement('div');
+      div.className = isError ? 'error' : 'success';
+      div.textContent = msg;
+      logEl.appendChild(div);
+      console.log(msg);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function createTestChart() {
+      const el = document.getElementById('chart');
+      el.innerHTML = '';  // 清空容器
+      return LightweightCharts.createChart(el, {
+        width: el.clientWidth,
+        height: 300,
+        layout: { background: { type: 'solid', color: '#fff' }, textColor: '#333' }
+      });
+    }
+
+    // 测试1: addSeries(数字, options)
+    function testAddSeriesWithNumber() {
+      addLog('=== 测试 addSeries(数字, options) ===');
+      try {
+        const chart = createTestChart();
+        addLog('✅ Chart 创建成功');
+
+        // 测试 Candlestick (2)
+        try {
+          const c = chart.addSeries(2, { upColor: '#ef5350', downColor: '#26a69a' });
+          addLog('✅ addSeries(2) 成功（Candlestick）');
+          c.setData([
+            { time: '2024-01-01', open: 100, high: 110, low: 95, close: 105 },
+            { time: '2024-01-02', open: 105, high: 115, low: 100, close: 110 },
+          ]);
+          addLog('✅ Candlestick 数据设置成功');
+        } catch(e) {
+          addLog(`❌ addSeries(2) 失败: ${e.message}`, true);
+        }
+
+        // 测试 Line (0)
+        try {
+          const l = chart.addSeries(0, { color: '#2962FF', lineWidth: 2 });
+          addLog('✅ addSeries(0) 成功（Line）');
+        } catch(e) {
+          addLog(`❌ addSeries(0) 失败: ${e.message}`, true);
+        }
+
+        // 测试 Histogram (3)
+        try {
+          const h = chart.addSeries(3, { priceFormat: { type: 'volume' }, priceScaleId: '' });
+          addLog('✅ addSeries(3) 成功（Histogram）');
+        } catch(e) {
+          addLog(`❌ addSeries(3) 失败: ${e.message}`, true);
+        }
+
+      } catch(e) {
+        addLog(`❌ 错误: ${e.message}`, true);
+      }
+    }
+
+    // 测试2: addSeries({type}, options)
+    function testAddSeriesWithObject() {
+      addLog('=== 测试 addSeries({type}, options) ===');
+      try {
+        const chart = createTestChart();
+        addLog('✅ Chart 创建成功');
+
+        // 测试 Candlestick
+        try {
+          const c = chart.addSeries({ type: 'Candlestick' }, { upColor: '#ef5350', downColor: '#26a69a' });
+          addLog('✅ addSeries({type:"Candlestick"}) 成功');
+        } catch(e) {
+          addLog(`❌ addSeries({type:"Candlestick"}) 失败: ${e.message}`, true);
+        }
+
+        // 测试 Line
+        try {
+          const l = chart.addSeries({ type: 'Line' }, { color: '#2962FF', lineWidth: 2 });
+          addLog('✅ addSeries({type:"Line"}) 成功');
+        } catch(e) {
+          addLog(`❌ addSeries({type:"Line"}) 失败: ${e.message}`, true);
+        }
+
+      } catch(e) {
+        addLog(`❌ 错误: ${e.message}`, true);
+      }
+    }
+
+    // 测试3: addLineSeries (旧API)
+    function testAddLineSeries() {
+      addLog('=== 测试 addLineSeries(options) (旧API) ===');
+      try {
+        const chart = createTestChart();
+        addLog('✅ Chart 创建成功');
+
+        try {
+          const l = chart.addLineSeries({ color: '#2962FF', lineWidth: 2 });
+          addLog('✅ addLineSeries() 成功（旧API仍支持）');
+        } catch(e) {
+          addLog(`❌ addLineSeries() 失败: ${e.message}`, true);
+        }
+
+        try {
+          const c = chart.addCandlestickSeries({ upColor: '#ef5350', downColor: '#26a69a' });
+          addLog('✅ addCandlestickSeries() 成功（旧API仍支持）');
+        } catch(e) {
+          addLog(`❌ addCandlestickSeries() 失败: ${e.message}`, true);
+        }
+
+      } catch(e) {
+        addLog(`❌ 错误: ${e.message}`, true);
+      }
+    }
+
+    // 页面加载时自动运行测试1
+    window.onload = function() {
+      addLog('页面加载完成，开始自动测试...');
+      testAddSeriesWithNumber();
+    };
+  </script>
+</body>
+</html>
