@@ -64,23 +64,28 @@ createApp({
     // =========== 股票搜索 ===========
     const searchQuery = ref('');
     const searchResults = ref([]);
-    const stockList = [
-      { code:'sh000001', name:'上证指数' },
-      { code:'sz399001', name:'深证成指' },
-      { code:'sh600000', name:'浦发银行' },
-      { code:'sh600036', name:'招商银行' },
-      { code:'sh600519', name:'贵州茅台' },
-      { code:'sh601318', name:'中国平安' },
-      { code:'sz000001', name:'平安银行' },
-      { code:'sz000333', name:'美的集团' },
-      { code:'sz002594', name:'比亚迪' },
-      { code:'sz300750', name:'宁德时代' },
-    ];
+    const stockList = ref([]);  // 从 data/index.json 动态加载
+
+    async function loadStockList() {
+      try {
+        const resp = await fetch('data/index.json');
+        stockList.value = await resp.json();
+      } catch(e) {
+        console.warn('加载股票列表失败，使用内置列表', e);
+        stockList.value = [
+          { code:'sh600000', name:'浦发银行' },
+          { code:'sh600519', name:'贵州茅台' },
+          { code:'sh601318', name:'中国平安' },
+          { code:'sz000001', name:'平安银行' },
+          { code:'sz002594', name:'比亚迪' },
+        ];
+      }
+    }
 
     function onSearchInput() {
       const q = searchQuery.value.trim().toLowerCase();
       if (q.length < 2) { searchResults.value = []; return; }
-      searchResults.value = stockList.filter(s =>
+      searchResults.value = stockList.value.filter(s =>
         s.code.toLowerCase().includes(q) ||
         s.name.toLowerCase().includes(q)
       ).slice(0, 8);
@@ -287,36 +292,81 @@ createApp({
       renderChart();
     }
 
+    // =========== 获取K线数据（新浪K线API）===========
+    async function fetchKline(code, datalen = 200) {
+      // scale: 5/15/30/60/240(日K)/1440(周K)
+      const periodMap = { daily:'240', weekly:'1440', monthly:'10080' };
+      const scale = periodMap[period.value] || '240';
+      const url = `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${code}&scale=${scale}&ma=no&datalen=${datalen}`;
+
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const raw = await resp.json();
+      if (!Array.isArray(raw) || raw.length === 0) throw new Error('K线数据为空');
+
+      return raw.map(item => ({
+        time:   item.day,  // "2024-01-02"
+        open:   parseFloat(item.open),
+        high:   parseFloat(item.high),
+        low:    parseFloat(item.low),
+        close:  parseFloat(item.close),
+        volume: parseInt(item.volume) || 0,
+      }));
+    }
+
     // =========== 获取实时行情 ===========
     async function loadStock() {
       const code = stockCode.value.trim();
       if (!code) return;
 
       try {
-        // 尝试新浪财经API（可能有跨域问题）
-        const resp = await fetch(`https://hq.sinajs.cn/list=${code}`);
-        const text = await resp.text();
-        const m = text.match(/="(.+)";/);
-        if (m && m[1]) {
-          const p = m[1].split(',');
-          if (p.length > 30) {
-            const close = parseFloat(p[2]);
-            const cur  = parseFloat(p[3]);
-            quote.value = {
-              name: p[0],
-              price: cur.toFixed(2),
-              change: (cur - close).toFixed(2),
-              pct: ((cur-close)/close*100).toFixed(2),
-              vol: parseInt(p[8]),
-              amt: parseFloat(p[9]),
-              time: p[31] || '--',
-            };
+        // 1. 获取K线数据
+        klineData = await fetchKline(code, 300);
+        console.log(`[loadStock] K线数据加载成功: ${klineData.length}根`);
+
+        // 2. 获取实时行情（新浪HQ接口）
+        try {
+          const resp = await fetch(`https://hq.sinajs.cn/list=${code}`);
+          const text = await resp.text();
+          const m = text.match(/="(.+)";/);
+          if (m && m[1]) {
+            const p = m[1].split(',');
+            if (p.length > 30) {
+              const close = parseFloat(p[2]) || 0;
+              const cur  = parseFloat(p[3]) || 0;
+              quote.value = {
+                name: p[0],
+                price: cur.toFixed(2),
+                change: (cur - close).toFixed(2),
+                pct: close ? ((cur - close) / close * 100).toFixed(2) : '0.00',
+                vol: parseInt(p[8]) || 0,
+                amt: parseFloat(p[9]) || 0,
+                time: (p[30] || '') + ' ' + (p[31] || ''),
+              };
+            }
           }
+        } catch(e) {
+          // 实时行情失败不影响K线显示
+          console.warn('实时行情获取失败，使用K线最新价', e);
+          const last = klineData[klineData.length - 1];
+          quote.value = {
+            name: code,
+            price: last.close.toFixed(2),
+            change: '0.00',
+            pct: '0.00',
+            vol: last.volume,
+            amt: last.close * last.volume,
+            time: last.time,
+          };
         }
+
+        renderChart();
       } catch(e) {
-        // 跨域失败，使用模拟数据
+        console.error('加载股票数据失败', e);
+        // 回退到模拟数据
+        klineData = generateKline(200);
         quote.value = {
-          name: '浦发银行(示例)',
+          name: code + '(模拟)',
           price: '10.50',
           change: '0.25',
           pct: '2.44',
@@ -324,11 +374,8 @@ createApp({
           amt: 131250000,
           time: new Date().toLocaleTimeString(),
         };
+        renderChart();
       }
-
-      // 生成K线数据
-      klineData = generateKline(200);
-      renderChart();
     }
 
     // =========== 回测 ===========
@@ -535,20 +582,12 @@ createApp({
     }
 
     // =========== 生命周期 ===========
-    onMounted(() => {
+    onMounted(async () => {
       initChart();
-      klineData = generateKline(200);
-      renderChart();
-      // 自动加载示例行情
-      quote.value = {
-        name: '浦发银行(示例)',
-        price: '10.50',
-        change: '0.25',
-        pct: '2.44',
-        vol: 12500000,
-        amt: 131250000,
-        time: new Date().toLocaleTimeString(),
-      };
+      // 加载股票列表
+      await loadStockList();
+      // 加载默认股票数据
+      await loadStock();
       // 模拟基本面数据
       fundamentalList.value = [
         { key:'pe',  label:'PE(TTM)',  value:'15.20', percentile:45.2 },
