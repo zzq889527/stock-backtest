@@ -1097,7 +1097,7 @@ createApp({
       searchQuery, searchResults, onSearchInput, selectStock,
       updateTimer, startRealtime, stopRealtime,
       showLog, toggleLog,
-      loadStock, toggleIndicator, toggleLogScale, runBacktest, showFundamental,
+      loadStock, toggleIndicator, toggleLogScale, toggleFundPanel, runBacktest, showFundamental,
       fmtVol, fmtAmt,
     };
   }
