@@ -309,7 +309,7 @@
         <button class="indicator-btn" :class="{active: useLogScale}"
                 @click="toggleLogScale" style="margin-left:auto;">📐 对数</button>
         <button class="indicator-btn" :class="{active: showFundPanel}"
-                @click="toggleFundPanel">📊 基本面</button>
+                @click="toggleFundPanel">📊 基本面 <span v-if="showFundPanel" style="color:#22c55e;font-size:10px;">●</span></button>
       </div>
     </div>
 

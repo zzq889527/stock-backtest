@@ -371,16 +371,25 @@ createApp({
     }
 
     function toggleFundPanel() {
+      console.log('[toggleFundPanel] 点击, 当前状态:', showFundPanel.value);
       showFundPanel.value = !showFundPanel.value;
-      reLayoutPanels();
-      if (showFundPanel.value && fundHistory.value?.history?.length) {
-        createFundPanelSeries();
-      } else if (showFundPanel.value) {
-        loadFundHistoryForPanel();
-      } else {
-        removeFundSeries();
+      console.log('[toggleFundPanel] 新状态:', showFundPanel.value);
+      if (!chart) { console.warn('[toggleFundPanel] chart未初始化'); return; }
+      try {
+        reLayoutPanels();
+        if (showFundPanel.value) {
+          if (fundHistory.value?.history?.length) {
+            createFundPanelSeries();
+          } else {
+            loadFundHistoryForPanel();
+          }
+        } else {
+          removeFundSeries();
+        }
+        chart.timeScale().fitContent();
+      } catch(e) {
+        console.error('[toggleFundPanel] 错误:', e);
       }
-      chart.timeScale().fitContent();
     }
     
     function reLayoutPanels() {
