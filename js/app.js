@@ -157,7 +157,7 @@ createApp({
             horzLines: { color:'#f0f0f0' } 
           },
           crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-          rightPriceScale: { borderColor:'#e0e0e0' },
+          rightPriceScale: { borderColor:'#e0e0e0', scaleMargins:{ top:0.0, bottom:0.50 } },
           timeScale: { 
             borderColor:'#e0e0e0', 
             timeVisible: false, 
@@ -272,7 +272,7 @@ createApp({
         // MACD 直方图 - Histogram series
         macdHist = chart.addSeries(LightweightCharts.HistogramSeries, {
           priceScaleId: 'macd',
-          scaleMargins: { top:0.7, bottom:0 },
+          scaleMargins: { top:0.52, bottom:0.26 },
         });
         
         // MACD 线 - Line series
@@ -292,7 +292,7 @@ createApp({
           priceLineVisible:false 
         });
         
-        chart.priceScale('macd').applyOptions({ scaleMargins:{top:0.7,bottom:0} });
+        chart.priceScale('macd').applyOptions({ scaleMargins:{top:0.52,bottom:0.26} });
       }
       
       const { dif, dea, macd } = Indicators.MACD(closes, 12, 26, 9);
@@ -316,7 +316,7 @@ createApp({
           lastValueVisible:false, 
           priceLineVisible:false,
         });
-        chart.priceScale('rsi').applyOptions({ scaleMargins:{top:0.05,bottom:0.05} });
+        chart.priceScale('rsi').applyOptions({ scaleMargins:{top:0.78,bottom:0.02} });
       }
       
       const rsi = Indicators.RSI(closes, 14);
@@ -441,8 +441,9 @@ createApp({
         } catch(e) {
           console.warn('实时行情获取失败，使用K线最后价格', e);
           const last = klineData[klineData.length - 1];
+          const found = stockList.value.find(s => s.code === code);
           quote.value = {
-            name: code,
+            name: found ? found.name : code,
             price: last.close.toFixed(2),
             change: '0.00',
             pct: '0.00',
@@ -456,9 +457,10 @@ createApp({
       } catch(e) {
         console.error('加载股票数据失败', e);
         // 使用模拟数据
+        const found = stockList.value.find(s => s.code === code);
         klineData = generateKline(200);
         quote.value = {
-          name: code + '(模拟)',
+          name: found ? found.name : code + '(模拟)',
           price: '10.50',
           change: '0.25',
           pct: '2.44',
