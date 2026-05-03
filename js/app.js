@@ -330,7 +330,7 @@ createApp({
         bollLower  = chart.addSeries(LightweightCharts.LineSeries, { color:'#9c27b0', lineWidth:1, lastValueVisible:false, priceLineVisible:false });
       }
       
-      const { upper, middle, lower } = Indicators.BOLL(closes, 20, 2);
+      const { upper, mid: middle, lower } = Indicators.BOLL(closes, 20, 2);
       
       bollUpper.setData(klineData.map((d,i) => ({time:d.time, value:upper[i]})));
       bollMiddle.setData(klineData.map((d,i) => ({time:d.time, value:middle[i]})));
