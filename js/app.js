@@ -292,19 +292,32 @@ createApp({
       renderChart();
     }
 
-    // =========== 获取K线数据（新浪K线API，带CORS降级）===========
+    // =========== 获取K线数据（优先本地JSON，降级到API）===========
     async function fetchKline(code, datalen = 200) {
-      const periodMap = { daily:'240', weekly:'1440', monthly:'10080' };
-      const scale = periodMap[period.value] || '240';
-      const targetUrl = `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${code}&scale=${scale}&ma=no&datalen=${datalen}`;
-
-      // 第1步：尝试直接请求
+      // 第1步：优先加载本地预生成的JSON文件（无CORS问题）
       try {
+        const localUrl = `data/kline/${code}.json`;
+        const resp = await fetch(localUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const kline = await resp.json();
+        if (!Array.isArray(kline) || kline.length === 0) throw new Error('本地K线数据为空');
+        console.log(`[fetchKline] 本地文件加载成功: ${kline.length}根`);
+        return kline;
+      } catch(e) {
+        console.warn('[fetchKline] 本地文件不存在，尝试网络请求', e.message);
+      }
+
+      // 第2步：尝试新浪API（可能有CORS问题）
+      try {
+        const periodMap = { daily:'240', weekly:'1440', monthly:'10080' };
+        const scale = periodMap[period.value] || '240';
+        const targetUrl = `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${code}&scale=${scale}&ma=no&datalen=${datalen}`;
+        
         const resp = await fetch(targetUrl);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const raw = await resp.json();
         if (!Array.isArray(raw) || raw.length === 0) throw new Error('K线数据为空');
-        console.log(`[fetchKline] 直接请求成功: ${raw.length}根`);
+        console.log(`[fetchKline] API请求成功: ${raw.length}根`);
         return raw.map(item => ({
           time:   item.day,
           open:   parseFloat(item.open),
@@ -314,11 +327,14 @@ createApp({
           volume: parseInt(item.volume) || 0,
         }));
       } catch(e) {
-        console.warn('[fetchKline] 直接请求失败，尝试CORS代理', e.message);
+        console.warn('[fetchKline] API请求失败，尝试CORS代理', e.message);
       }
 
-      // 第2步：尝试 allorigins CORS 代理
+      // 第3步：CORS代理
       try {
+        const periodMap = { daily:'240', weekly:'1440', monthly:'10080' };
+        const scale = periodMap[period.value] || '240';
+        const targetUrl = `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${code}&scale=${scale}&ma=no&datalen=${datalen}`;
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
         const resp = await fetch(proxyUrl);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -334,8 +350,8 @@ createApp({
           volume: parseInt(item.volume) || 0,
         }));
       } catch(e) {
-        console.error('[fetchKline] CORS代理也失败', e.message);
-        throw new Error('K线数据获取失败（CORS限制）');
+        console.error('[fetchKline] 所有方式均失败', e.message);
+        throw new Error('K线数据获取失败');
       }
     }
 
