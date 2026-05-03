@@ -61,6 +61,38 @@ createApp({
     let equityChart = null;
     let fundChart = null;
 
+    // =========== 股票搜索 ===========
+    const searchQuery = ref('');
+    const searchResults = ref([]);
+    const stockList = [
+      { code:'sh000001', name:'上证指数' },
+      { code:'sz399001', name:'深证成指' },
+      { code:'sh600000', name:'浦发银行' },
+      { code:'sh600036', name:'招商银行' },
+      { code:'sh600519', name:'贵州茅台' },
+      { code:'sh601318', name:'中国平安' },
+      { code:'sz000001', name:'平安银行' },
+      { code:'sz000333', name:'美的集团' },
+      { code:'sz002594', name:'比亚迪' },
+      { code:'sz300750', name:'宁德时代' },
+    ];
+
+    function onSearchInput() {
+      const q = searchQuery.value.trim().toLowerCase();
+      if (q.length < 2) { searchResults.value = []; return; }
+      searchResults.value = stockList.filter(s =>
+        s.code.toLowerCase().includes(q) ||
+        s.name.toLowerCase().includes(q)
+      ).slice(0, 8);
+    }
+
+    function selectStock(item) {
+      stockCode.value = item.code;
+      searchQuery.value = item.code + ' ' + item.name;
+      searchResults.value = [];
+      loadStock();
+    }
+
     // =========== K线数据生成 ===========
     function generateKline(days = 200) {
       const data = [];
@@ -441,6 +473,53 @@ createApp({
       });
     }
 
+    // =========== 实时行情定时器 ===========
+    const updateTimer = ref(null);
+    function startRealtime() {
+      if (updateTimer.value) return;
+      updateTimer.value = setInterval(() => {
+        updateRealtime();
+      }, 3000);
+      if (quote.value) {
+        quote.value = { ...quote.value, time: '● 实时中...' };
+      }
+    }
+    function stopRealtime() {
+      if (updateTimer.value) {
+        clearInterval(updateTimer.value);
+        updateTimer.value = null;
+      }
+    }
+    async function updateRealtime() {
+      const code = stockCode.value.trim();
+      if (!code || !quote.value) return;
+      try {
+        const resp = await fetch(`https://hq.sinajs.cn/list=${code}`);
+        const text = await resp.text();
+        const m = text.match(/="(.+)";/);
+        if (m && m[1]) {
+          const p = m[1].split(',');
+          if (p.length > 3) {
+            const close = parseFloat(p[2]) || 0;
+            const cur  = parseFloat(p[3]) || 0;
+            quote.value = {
+              ...quote.value,
+              price: cur.toFixed(2),
+              change: (cur - close).toFixed(2),
+              pct: close ? ((cur - close) / close * 100).toFixed(2) : '0.00',
+              vol: parseInt(p[8]) || 0,
+              amt: parseFloat(p[9]) || 0,
+              time: (p[30] || '') + ' ' + (p[31] || ''),
+            };
+          }
+        }
+      } catch(e) { /* 静默失败，保持上次数据 */ }
+    }
+
+    // =========== 日志开关 ===========
+    const showLog = ref(false);
+    function toggleLog() { showLog.value = !showLog.value; }
+
     // =========== 格式化 ===========
     function fmtVol(v) {
       if (!v) return '--';
@@ -484,6 +563,9 @@ createApp({
       indicators, periods, mainTabs,
       btStrategy, btCapital, btParam, btResult,
       fundamentalList, activeFund,
+      searchQuery, searchResults, onSearchInput, selectStock,
+      updateTimer, startRealtime, stopRealtime,
+      showLog, toggleLog,
       loadStock, toggleIndicator, runBacktest, showFundamental,
       fmtVol, fmtAmt,
     };
