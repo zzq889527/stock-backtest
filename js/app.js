@@ -66,7 +66,8 @@ createApp({
     let macdHist = null, macdDif = null, macdDea = null;
     let rsiSeries = null;
     let equityChart = null;
-    let fundamentalTrendChart = null;  // 基本面趋势图
+    // 基本面独立图表
+    let peChart = null, pbChart = null, roeChart = null, dyChart = null;
     const fundHistory = ref(null);
 
     // =========== 股票搜索 ===========
@@ -734,7 +735,48 @@ createApp({
         const url = `data/fundamentals/${code}_history.json`;
         const resp = await fetch(url);
         if (!resp.ok) throw new Error('无基本面数据');
-        fundHistory.value = await resp.json();
+        const json = await resp.json();
+        const history = json.history || json;  // 兼容两种格式
+
+        // 计算分位数
+        const calcPct = (arr, val) => {
+          const sorted = arr.filter(v => v != null && isFinite(v)).sort((a,b)=>a-b);
+          if (sorted.length === 0) return 50;
+          if (val <= sorted[0]) return 0;
+          if (val >= sorted[sorted.length-1]) return 100;
+          let cnt = 0;
+          for (const v of sorted) { if (v <= val) cnt++; else break; }
+          return (cnt / sorted.length) * 100;
+        };
+
+        const peArr = history.map(h=>h.pe_ttm).filter(v=>v!=null);
+        const pbArr = history.map(h=>h.pb).filter(v=>v!=null);
+        const roeArr = history.map(h=>h.roe).filter(v=>v!=null);
+        const dyArr = history.map(h=>h.dividend_yield).filter(v=>v!=null);
+
+        const latest = history[history.length-1] || {};
+        fundHistory.value = {
+          history: history,
+          current: {
+            pe_ttm: latest.pe_ttm,
+            pb: latest.pb,
+            roe: latest.roe,
+            dividend_yield: latest.dividend_yield,
+            pe_percentile: calcPct(peArr, latest.pe_ttm),
+            pb_percentile: calcPct(pbArr, latest.pb),
+            roe_percentile: calcPct(roeArr, latest.roe),
+            dividend_yield_percentile: calcPct(dyArr, latest.dividend_yield),
+          }
+        };
+
+        // 更新基本面卡片数据
+        fundamentalList.value = [
+          { key:'pe',  label:'PE(TTM)',  value:latest.pe_ttm?.toFixed(2)||'--', percentile: fundHistory.value.current.pe_percentile?.toFixed(1)||'--' },
+          { key:'pb',  label:'PB',       value:latest.pb?.toFixed(2)||'--', percentile: fundHistory.value.current.pb_percentile?.toFixed(1)||'--' },
+          { key:'roe', label:'ROE',      value:(latest.roe?.toFixed(2)||'--')+'%', percentile: fundHistory.value.current.roe_percentile?.toFixed(1)||'--' },
+          { key:'dy',  label:'股息率',   value:(latest.dividend_yield?.toFixed(2)||'--')+'%', percentile: fundHistory.value.current.dividend_yield_percentile?.toFixed(1)||'--' },
+        ];
+
         renderFundamentalCharts();
       } catch(e) {
         console.warn('加载基本面历史数据失败', e);
@@ -756,25 +798,149 @@ createApp({
     }
 
     function renderFundamentalCharts() {
-      if (!fundHistory.value || fundHistory.value.history.length === 0) return;
+      if (!fundHistory.value || !fundHistory.value.history || fundHistory.value.history.length === 0) return;
+
       nextTick(() => {
-        const trendEl = document.getElementById('fund-trend-chart');
-        if (trendEl && fundamentalTrendChart) { fundamentalTrendChart.remove(); fundamentalTrendChart = null; }
-        if (trendEl) {
-          fundamentalTrendChart = LightweightCharts.createChart(trendEl, {
-            width: trendEl.clientWidth, height: 300,
-            layout:{background:{type:'solid',color:'#fff'},textColor:'#333'},
-            grid:{vertLines:{color:'#f0f0f0'},horzLines:{color:'#f0f0f0'}},
+        const history = fundHistory.value.history;
+        const current = fundHistory.value.current || {};
+
+        // ====== 1. PE(TTM) 独立图表 ======
+        const peEl = document.getElementById('pe-chart');
+        if (peEl) {
+          if (peChart) { peChart.remove(); peChart = null; }
+          peChart = LightweightCharts.createChart(peEl, {
+            width: peEl.clientWidth,
+            height: 220,
+            layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
+            grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
+            rightPriceScale: { borderColor:'#d0d0d0' },
+            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{
+              const d=new Date(time*1000);return (d.getMonth()+1)+'/'+d.getDate();
+            }},
+            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
           });
-          const history = fundHistory.value.history;
-          const peData = history.map(h => ({ time: h.date, value: h.pe_ttm || null }));
-          const peSeries = fundamentalTrendChart.addSeries(LightweightCharts.LineSeries, { color:'#2962FF', lineWidth:2, title:'PE(TTM)' });
-          peSeries.setData(peData.filter(d => d.value));
-          const pbData = history.map(h => ({ time: h.date, value: h.pb || null }));
-          const pbSeries = fundamentalTrendChart.addSeries(LightweightCharts.LineSeries, { color:'#FF6B6B', lineWidth:2, title:'PB' });
-          pbSeries.setData(pbData.filter(d => d.value));
-          fundamentalTrendChart.timeScale().fitContent();
+          const peData = history.map(h => ({ time: h.date, value: h.pe_ttm || null })).filter(d => d.value);
+          const peSeries = peChart.addSeries(LightweightCharts.LineSeries, {
+            color:'#2962FF', lineWidth:2, title:'PE(TTM)',
+            priceFormat: { type:'price', precision:2, minMove:0.01 },
+          });
+          peSeries.setData(peData);
+          // 添加当前值标记线
+          if (current.pe_ttm) {
+            peSeries.createPriceLine({
+              price: current.pe_ttm,
+              color: current.pe_percentile<=30?'#16a34a':current.pe_percentile>=70?'#dc2626':'#ca8a04',
+              lineWidth: 2,
+              lineStyle: 2,
+              axisLabelVisible: true,
+              title: '当前',
+            });
+          }
+          peChart.timeScale().fitContent();
         }
+
+        // ====== 2. PB 独立图表 ======
+        const pbEl = document.getElementById('pb-chart');
+        if (pbEl) {
+          if (pbChart) { pbChart.remove(); pbChart = null; }
+          pbChart = LightweightCharts.createChart(pbEl, {
+            width: pbEl.clientWidth,
+            height: 220,
+            layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
+            grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
+            rightPriceScale: { borderColor:'#d0d0d0' },
+            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{
+              const d=new Date(time*1000);return (d.getMonth()+1)+'/'+d.getDate();
+            }},
+            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
+          });
+          const pbData = history.map(h => ({ time: h.date, value: h.pb || null })).filter(d => d.value);
+          const pbSeries = pbChart.addSeries(LightweightCharts.LineSeries, {
+            color:'#FF6B6B', lineWidth:2, title:'PB',
+            priceFormat: { type:'price', precision:2, minMove:0.01 },
+          });
+          pbSeries.setData(pbData);
+          if (current.pb) {
+            pbSeries.createPriceLine({
+              price: current.pb,
+              color: current.pb_percentile<=30?'#16a34a':current.pb_percentile>=70?'#dc2626':'#ca8a04',
+              lineWidth: 2,
+              lineStyle: 2,
+              axisLabelVisible: true,
+              title: '当前',
+            });
+          }
+          pbChart.timeScale().fitContent();
+        }
+
+        // ====== 3. ROE 独立图表 ======
+        const roeEl = document.getElementById('roe-chart');
+        if (roeEl) {
+          if (roeChart) { roeChart.remove(); roeChart = null; }
+          roeChart = LightweightCharts.createChart(roeEl, {
+            width: roeEl.clientWidth,
+            height: 220,
+            layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
+            grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
+            rightPriceScale: { borderColor:'#d0d0d0' },
+            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{
+              const d=new Date(time*1000);return (d.getMonth()+1)+'/'+d.getDate();
+            }},
+            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
+          });
+          const roeData = history.map(h => ({ time: h.date, value: h.roe || null })).filter(d => d.value);
+          const roeSeries = roeChart.addSeries(LightweightCharts.LineSeries, {
+            color:'#26A69A', lineWidth:2, title:'ROE(%)',
+            priceFormat: { type:'price', precision:2, minMove:0.01 },
+          });
+          roeSeries.setData(roeData);
+          if (current.roe) {
+            roeSeries.createPriceLine({
+              price: current.roe,
+              color: current.roe_percentile>=70?'#16a34a':current.roe_percentile<=30?'#dc2626':'#ca8a04',
+              lineWidth: 2,
+              lineStyle: 2,
+              axisLabelVisible: true,
+              title: '当前',
+            });
+          }
+          roeChart.timeScale().fitContent();
+        }
+
+        // ====== 4. 股息率 独立图表 ======
+        const dyEl = document.getElementById('dy-chart');
+        if (dyEl) {
+          if (dyChart) { dyChart.remove(); dyChart = null; }
+          dyChart = LightweightCharts.createChart(dyEl, {
+            width: dyEl.clientWidth,
+            height: 220,
+            layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
+            grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
+            rightPriceScale: { borderColor:'#d0d0d0' },
+            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{
+              const d=new Date(time*1000);return (d.getMonth()+1)+'/'+d.getDate();
+            }},
+            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
+          });
+          const dyData = history.map(h => ({ time: h.date, value: h.dividend_yield || null })).filter(d => d.value);
+          const dySeries = dyChart.addSeries(LightweightCharts.LineSeries, {
+            color:'#FFA726', lineWidth:2, title:'股息率(%)',
+            priceFormat: { type:'price', precision:2, minMove:0.01 },
+          });
+          dySeries.setData(dyData);
+          if (current.dividend_yield) {
+            dySeries.createPriceLine({
+              price: current.dividend_yield,
+              color: current.dividend_yield_percentile>=70?'#16a34a':current.dividend_yield_percentile<=30?'#dc2626':'#ca8a04',
+              lineWidth: 2,
+              lineStyle: 2,
+              axisLabelVisible: true,
+              title: '当前',
+            });
+          }
+          dyChart.timeScale().fitContent();
+        }
+
         renderPercentileChart();
       });
     }

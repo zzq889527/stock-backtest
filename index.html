@@ -224,6 +224,38 @@
   .fund-value { font-size: 18px; font-weight: 700; }
   .fund-pct { font-size: 12px; margin-top: 2px; }
 
+  /* ========== 基本面图表 ========== */
+  .fund-chart-container {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    border: 1px solid #e8e8e8;
+    transition: box-shadow 0.3s;
+  }
+  .fund-chart-container:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .fund-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .fund-chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+  }
+  .fund-chart-value {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .fund-chart {
+    height: 220px;
+    width: 100%;
+  }
+
   /* ========== 日志 ========== */
   .log-panel {
     background: #1e1e1e;
@@ -406,16 +438,72 @@
     <!-- 基本面 -->
     <div v-show="activeMainTab==='fundamental'">
       <h3 style="margin-bottom:12px;font-size:16px;">📈 基本面数据</h3>
-      <!-- 指标历史走势图 -->
-      <div id="fund-trend-chart" style="height:300px;"></div>
+
+      <!-- PE(TTM) 走势图 -->
+      <div class="fund-chart-container">
+        <div class="fund-chart-header">
+          <span class="fund-chart-title">PE (TTM) 市盈率</span>
+          <span class="fund-chart-value" :style="{color: fundHistory&&fundHistory.current?(fundHistory.current.pe_percentile<=30?'#16a34a':fundHistory.current.pe_percentile>=70?'#dc2626':'#ca8a04'):'#666'}">
+            {{ fundHistory&&fundHistory.current?fundHistory.current.pe_ttm?.toFixed(2):'--' }}
+            <span style="font-size:11px;margin-left:4px;">
+              ({{ fundHistory&&fundHistory.current?fundHistory.current.pe_percentile?.toFixed(1):'--' }}%)
+            </span>
+          </span>
+        </div>
+        <div id="pe-chart" class="fund-chart"></div>
+      </div>
+
+      <!-- PB 走势图 -->
+      <div class="fund-chart-container">
+        <div class="fund-chart-header">
+          <span class="fund-chart-title">PB 市净率</span>
+          <span class="fund-chart-value" :style="{color: fundHistory&&fundHistory.current?(fundHistory.current.pb_percentile<=30?'#16a34a':fundHistory.current.pb_percentile>=70?'#dc2626':'#ca8a04'):'#666'}">
+            {{ fundHistory&&fundHistory.current?fundHistory.current.pb?.toFixed(2):'--' }}
+            <span style="font-size:11px;margin-left:4px;">
+              ({{ fundHistory&&fundHistory.current?fundHistory.current.pb_percentile?.toFixed(1):'--' }}%)
+            </span>
+          </span>
+        </div>
+        <div id="pb-chart" class="fund-chart"></div>
+      </div>
+
+      <!-- ROE 走势图 -->
+      <div class="fund-chart-container">
+        <div class="fund-chart-header">
+          <span class="fund-chart-title">ROE 净资产收益率</span>
+          <span class="fund-chart-value" :style="{color: fundHistory&&fundHistory.current?(fundHistory.current.roe_percentile>=70?'#16a34a':fundHistory.current.roe_percentile<=30?'#dc2626':'#ca8a04'):'#666'}">
+            {{ fundHistory&&fundHistory.current?fundHistory.current.roe?.toFixed(2)+'%':'--' }}
+            <span style="font-size:11px;margin-left:4px;">
+              ({{ fundHistory&&fundHistory.current?fundHistory.current.roe_percentile?.toFixed(1):'--' }}%)
+            </span>
+          </span>
+        </div>
+        <div id="roe-chart" class="fund-chart"></div>
+      </div>
+
+      <!-- 股息率 走势图 -->
+      <div class="fund-chart-container">
+        <div class="fund-chart-header">
+          <span class="fund-chart-title">股息率</span>
+          <span class="fund-chart-value" :style="{color: fundHistory&&fundHistory.current?(fundHistory.current.dividend_yield_percentile>=70?'#16a34a':fundHistory.current.dividend_yield_percentile<=30?'#dc2626':'#ca8a04'):'#666'}">
+            {{ fundHistory&&fundHistory.current?fundHistory.current.dividend_yield?.toFixed(2)+'%':'--' }}
+            <span style="font-size:11px;margin-left:4px;">
+              ({{ fundHistory&&fundHistory.current?fundHistory.current.dividend_yield_percentile?.toFixed(1):'--' }}%)
+            </span>
+          </span>
+        </div>
+        <div id="dy-chart" class="fund-chart"></div>
+      </div>
+
       <!-- 分位图（理杏仁风格） -->
-      <div id="percentile-chart" style="margin-top:16px;"></div>
+      <div id="percentile-chart" style="margin-top:20px;"></div>
+
       <!-- 基本面卡片 -->
       <div class="fund-grid" style="margin-top:16px;">
-        <div class="fund-card" v-for="f in fundamentalList" :key="f.key" @click="activeFund=f.key">
+        <div class="fund-card" v-for="f in fundamentalList" :key="f.key">
           <div class="fund-label">{{ f.label }}</div>
-          <div class="fund-value">{{ f.value }}</div>
-          <div class="fund-pct" :style="{color: f.percentile<=30?'#16a34a':f.percentile>=70?'#dc2626':'#ca8a04'}">
+          <div class="fund-value" :style="{color: f.percentile<=30?'#16a34a':f.percentile>=70?'#dc2626':'#ca8a04'}">{{ f.value }}</div>
+          <div class="fund-pct">
             分位：{{ f.percentile }}%（{{ f.percentile<=30?'低估':f.percentile>=70?'高估':'合理' }}）
           </div>
         </div>
