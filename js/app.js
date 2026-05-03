@@ -69,6 +69,8 @@ createApp({
     // 基本面独立图表
     let peChart = null, pbChart = null, roeChart = null, dyChart = null;
     const fundHistory = ref(null);
+    const showFundPanel = ref(false);
+    let fundSeries = { pe: null, pb: null, roe: null, dy: null };
 
     // =========== 股票搜索 ===========
     const searchQuery = ref('');
@@ -165,7 +167,15 @@ createApp({
           timeScale: { 
             borderColor:'#e0e0e0', 
             timeVisible: false, 
-            secondsVisible: false 
+            secondsVisible: false,
+            tickMarkFormatter: (time) => {
+              if (typeof time === 'string') {
+                const p = time.split('-');
+                return p[0] + '/' + parseInt(p[1]);
+              }
+              const d = new Date(time * 1000);
+              return d.getFullYear() + '/' + (d.getMonth() + 1);
+            },
           },
         });
 
@@ -346,6 +356,7 @@ createApp({
       const item = indicators.value.find(i => i.key === key);
       if (item) { item.on = !item.on; }
       renderChart();
+      if (showFundPanel.value) reLayoutPanels();
     }
 
     function toggleLogScale() {
@@ -357,6 +368,84 @@ createApp({
           }
         });
       }
+    }
+
+    function toggleFundPanel() {
+      showFundPanel.value = !showFundPanel.value;
+      reLayoutPanels();
+      if (showFundPanel.value && fundHistory.value?.history?.length) {
+        createFundPanelSeries();
+      } else if (showFundPanel.value) {
+        loadFundHistoryForPanel();
+      } else {
+        removeFundSeries();
+      }
+      chart.timeScale().fitContent();
+    }
+    
+    function reLayoutPanels() {
+      if (!chart) return;
+      const hf = showFundPanel.value;
+      chart.applyOptions({
+        rightPriceScale: { scaleMargins: hf ? {top:0, bottom:0.60} : {top:0, bottom:0.50} }
+      });
+      if (macdHist) {
+        chart.priceScale('macd').applyOptions({
+          scaleMargins: hf ? {top:0.42, bottom:0.30} : {top:0.52, bottom:0.26}
+        });
+      }
+      if (rsiSeries) {
+        chart.priceScale('rsi').applyOptions({
+          scaleMargins: hf ? {top:0.55, bottom:0.18} : {top:0.78, bottom:0.02}
+        });
+      }
+    }
+    
+    function createFundPanelSeries() {
+      removeFundSeries();
+      if (!fundHistory.value?.history?.length) return;
+      const h = fundHistory.value.history;
+      // 左侧Y轴: PE(蓝) + PB(红)
+      fundSeries.pe = chart.addSeries(LightweightCharts.LineSeries, {
+        priceScaleId:'fund-left', color:'#2962FF', lineWidth:2,
+        lastValueVisible:false, priceLineVisible:false
+      });
+      fundSeries.pe.setData(h.map(x=>({time:x.date, value:x.pe_ttm})).filter(d=>d.value));
+      fundSeries.pb = chart.addSeries(LightweightCharts.LineSeries, {
+        priceScaleId:'fund-left', color:'#FF6B6B', lineWidth:2,
+        lastValueVisible:false, priceLineVisible:false
+      });
+      fundSeries.pb.setData(h.map(x=>({time:x.date, value:x.pb})).filter(d=>d.value));
+      chart.priceScale('fund-left').applyOptions({
+        scaleMargins:{top:0.72, bottom:0}, borderColor:'#d0d0d0'
+      });
+      // 右侧Y轴: ROE(绿) + 股息率(橙)
+      fundSeries.roe = chart.addSeries(LightweightCharts.LineSeries, {
+        priceScaleId:'fund-right', color:'#26A69A', lineWidth:2,
+        lastValueVisible:false, priceLineVisible:false
+      });
+      fundSeries.roe.setData(h.map(x=>({time:x.date, value:x.roe})).filter(d=>d.value));
+      fundSeries.dy = chart.addSeries(LightweightCharts.LineSeries, {
+        priceScaleId:'fund-right', color:'#FFA726', lineWidth:2,
+        lastValueVisible:false, priceLineVisible:false
+      });
+      fundSeries.dy.setData(h.map(x=>({time:x.date, value:x.dividend_yield})).filter(d=>d.value));
+      chart.priceScale('fund-right').applyOptions({
+        scaleMargins:{top:0.72, bottom:0}, borderColor:'#d0d0d0'
+      });
+    }
+    
+    function removeFundSeries() {
+      Object.values(fundSeries).filter(Boolean).forEach(function(s) {
+        try { chart.removeSeries(s); } catch(e) {}
+      });
+      fundSeries = { pe: null, pb: null, roe: null, dy: null };
+    }
+    
+    async function loadFundHistoryForPanel() {
+      if (!stockCode.value) return;
+      await loadFundamentalHistory(stockCode.value);
+      createFundPanelSeries();
     }
 
     // =========== 获取K线数据 ===========
@@ -507,6 +596,9 @@ createApp({
           quoteSource.value = '回退';  // 标记为回退数据
         }
 
+        // 切换股票时清除基本面副图
+        fundHistory.value = null;
+        removeFundSeries();
         renderChart();
       } catch(e) {
         console.error('加载股票数据失败', e);
@@ -815,7 +907,14 @@ createApp({
             grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
             rightPriceScale: { borderColor:'#d0d0d0' },
             timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{if(typeof time==='string'){const p=time.split('-');return parseInt(p[1])+'月';}const d=new Date(time*1000);return (d.getMonth()+1)+'月';}},
-            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
+            tickMarkFormatter: (time) => {
+              if (typeof time === 'string') {
+                const p = time.split('-');
+                return p[0] + '/' + parseInt(p[1]);
+              }
+              const d = new Date(time * 1000);
+              return d.getFullYear() + '/' + (d.getMonth() + 1);
+            },            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
           });
           const peData = history.map(h => ({ time: h.date, value: h.pe_ttm || null })).filter(d => d.value);
           const peSeries = peChart.addSeries(LightweightCharts.LineSeries, {
@@ -970,19 +1069,9 @@ createApp({
     }
 
     async function showFundamental() {
-      activeMainTab.value = 'fundamental';
-      if (stockCode.value) {
-        await loadFundamentalHistory(stockCode.value);
-      }
-      // 窗口resize时自动调整图表宽度
-      if (!window._fundResizeHandler) {
-        window._fundResizeHandler = () => {
-          if (activeMainTab.value === 'fundamental' && fundHistory.value) {
-            renderFundamentalCharts();
-          }
-        };
-        window.addEventListener('resize', window._fundResizeHandler);
-      }
+      // 重定向到K线副图面板
+      activeMainTab.value = 'chart';
+      if (!showFundPanel.value) toggleFundPanel();
     }
 
     onMounted(async () => {
@@ -1004,7 +1093,7 @@ createApp({
       stockCode, activeMainTab, quote, quoteSource, period, chartHeight,
       indicators, periods, mainTabs, useLogScale,
       btStrategy, btCapital, btParam, btResult,
-      fundamentalList, fundHistory, activeFund,
+      fundamentalList, fundHistory, activeFund, showFundPanel,
       searchQuery, searchResults, onSearchInput, selectStock,
       updateTimer, startRealtime, stopRealtime,
       showLog, toggleLog,
