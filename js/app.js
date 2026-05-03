@@ -292,26 +292,51 @@ createApp({
       renderChart();
     }
 
-    // =========== 获取K线数据（新浪K线API）===========
+    // =========== 获取K线数据（新浪K线API，带CORS降级）===========
     async function fetchKline(code, datalen = 200) {
-      // scale: 5/15/30/60/240(日K)/1440(周K)
       const periodMap = { daily:'240', weekly:'1440', monthly:'10080' };
       const scale = periodMap[period.value] || '240';
-      const url = `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${code}&scale=${scale}&ma=no&datalen=${datalen}`;
+      const targetUrl = `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${code}&scale=${scale}&ma=no&datalen=${datalen}`;
 
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const raw = await resp.json();
-      if (!Array.isArray(raw) || raw.length === 0) throw new Error('K线数据为空');
+      // 第1步：尝试直接请求
+      try {
+        const resp = await fetch(targetUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const raw = await resp.json();
+        if (!Array.isArray(raw) || raw.length === 0) throw new Error('K线数据为空');
+        console.log(`[fetchKline] 直接请求成功: ${raw.length}根`);
+        return raw.map(item => ({
+          time:   item.day,
+          open:   parseFloat(item.open),
+          high:   parseFloat(item.high),
+          low:    parseFloat(item.low),
+          close:  parseFloat(item.close),
+          volume: parseInt(item.volume) || 0,
+        }));
+      } catch(e) {
+        console.warn('[fetchKline] 直接请求失败，尝试CORS代理', e.message);
+      }
 
-      return raw.map(item => ({
-        time:   item.day,  // "2024-01-02"
-        open:   parseFloat(item.open),
-        high:   parseFloat(item.high),
-        low:    parseFloat(item.low),
-        close:  parseFloat(item.close),
-        volume: parseInt(item.volume) || 0,
-      }));
+      // 第2步：尝试 allorigins CORS 代理
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        const resp = await fetch(proxyUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const raw = await resp.json();
+        if (!Array.isArray(raw) || raw.length === 0) throw new Error('K线数据为空');
+        console.log(`[fetchKline] 代理请求成功: ${raw.length}根`);
+        return raw.map(item => ({
+          time:   item.day,
+          open:   parseFloat(item.open),
+          high:   parseFloat(item.high),
+          low:    parseFloat(item.low),
+          close:  parseFloat(item.close),
+          volume: parseInt(item.volume) || 0,
+        }));
+      } catch(e) {
+        console.error('[fetchKline] CORS代理也失败', e.message);
+        throw new Error('K线数据获取失败（CORS限制）');
+      }
     }
 
     // =========== 获取实时行情 ===========
