@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>回测可视化测试</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,sans-serif;padding:20px;background:#f0f0f0;}
+.card{background:#fff;border-radius:12px;padding:20px;margin-bottom:15px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+button{padding:10px 20px;border:none;border-radius:8px;background:#667eea;color:#fff;font-size:14px;cursor:pointer;margin:5px;}
+#chart-wrap{width:100%;height:400px;position:relative;border:2px solid #e0e0e0;border-radius:12px;overflow:hidden;}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2>🎯 回测可视化测试</h2>
+  <p>测试在K线图上显示买卖信号的功能</p>
+  <button onclick="runTest()">▶️ 运行测试</button>
+  <button onclick="clearChart()">🗑️ 清除</button>
+</div>
+
+<div class="card">
+  <div id="chart-wrap">
+    <canvas id="kline-canvas"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📊 交易记录</h3>
+  <pre id="trades-log" style="background:#1e1e1e;color:#0f0;padding:10px;border-radius:8px;font-size:12px;max-height:200px;overflow-y:auto;"></pre>
+</div>
+
+<script src="js/indicators.js"></script>
+<script>
+// K线图类（简化版，用于测试）
+class KLineChart {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.data = [];
+    this.tradeSignals = [];
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  }
+  
+  resize() {
+    const wrap = document.getElementById('chart-wrap');
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = wrap.clientWidth * dpr;
+    this.canvas.height = wrap.clientHeight * dpr;
+    this.canvas.style.width = wrap.clientWidth + 'px';
+    this.canvas.style.height = wrap.clientHeight + 'px';
+    this.dpr = dpr;
+    this.render();
+  }
+  
+  setData(data) {
+    this.data = data;
+    this.tradeSignals = [];
+    if (typeof calcAllIndicators === 'function') {
+      this.indicators = calcAllIndicators(data);
+    }
+    this.render();
+  }
+  
+  setTradeSignals(signals) {
+    this.tradeSignals = signals;
+    this.render();
+  }
+  
+  render() {
+    if (!this.data.length) return;
+    
+    const ctx = this.ctx;
+    const dpr = this.dpr || 1;
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(0, 0, W, H);
+    
+    const padL = 60 * dpr;
+    const padR = 20 * dpr;
+    const padT = 20 * dpr;
+    const padB = 30 * dpr;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+    
+    let minP = Infinity, maxP = -Infinity;
+    for (const d of this.data) {
+      if (d.low < minP) minP = d.low;
+      if (d.high > maxP) maxP = d.high;
+    }
+    minP *= 0.99;
+    maxP *= 1.01;
+    
+    const barW = chartW / this.data.length;
+    
+    // 绘制K线
+    for (let i = 0; i < this.data.length; i++) {
+      const d = this.data[i];
+      const x = padL + (i + 0.5) * barW;
+      const isUp = d.close >= d.open;
+      const color = isUp ? '#ef5350' : '#26a69a';
+      
+      ctx.strokeStyle = color;
+      const yHigh = padT + (maxP - d.high) / (maxP - minP) * chartH;
+      const yLow = padT + (maxP - d.low) / (maxP - minP) * chartH;
+      ctx.beginPath();
+      ctx.moveTo(x, yHigh);
+      ctx.lineTo(x, yLow);
+      ctx.stroke();
+      
+      const yOpen = padT + (maxP - d.open) / (maxP - minP) * chartH;
+      const yClose = padT + (maxP - d.close) / (maxP - minP) * chartH;
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyH = Math.max(2 * dpr, Math.abs(yOpen - yClose));
+      
+      ctx.fillStyle = color;
+      ctx.fillRect(x - barW * 0.4, bodyTop, barW * 0.8, bodyH);
+    }
+    
+    // 绘制交易信号
+    this.drawTradeSignals(padL, padT, chartH, barW, minP, maxP);
+  }
+  
+  drawTradeSignals(padL, padT, chartH, barW, minP, maxP) {
+    if (!this.tradeSignals || this.tradeSignals.length === 0) return;
+    
+    const ctx = this.ctx;
+    const dpr = this.dpr || 1;
+    
+    this.tradeSignals.forEach(signal => {
+      const x = padL + (signal.index + 0.5) * barW;
+      const y = padT + (maxP - signal.price) / (maxP - minP) * chartH;
+      
+      ctx.fillStyle = signal.type === 'buy' ? '#22c55e' : '#ef5350';
+      ctx.font = `${14 * dpr}px sans-serif`;
+      ctx.textAlign = 'center';
+      
+      if (signal.type === 'buy') {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 15 * dpr);
+        ctx.lineTo(x - 8 * dpr, y - 3 * dpr);
+        ctx.lineTo(x + 8 * dpr, y - 3 * dpr);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillText('B', x, y - 18 * dpr);
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(x, y + 15 * dpr);
+        ctx.lineTo(x - 8 * dpr, y + 3 * dpr);
+        ctx.lineTo(x + 8 * dpr, y + 3 * dpr);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillText('S', x, y + 28 * dpr);
+      }
+    });
+  }
+}
+
+// 生成测试数据
+function generateTestData(days=100) {
+  const data = [];
+  let price = 10.0;
+  for (let i = 0; i < days; i++) {
+    const o = price;
+    const c = o + (Math.random() - 0.48) * 0.5;
+    const h = Math.max(o, c) + Math.random() * 0.3;
+    const l = Math.min(o, c) - Math.random() * 0.3;
+    const v = Math.floor(Math.random() * 5000000 + 1000000);
+    data.push({ time: '2026-05-' + (i % 30 + 1), open: o, high: h, low: l, close: c, volume: v });
+    price = c;
+  }
+  return data;
+}
+
+// 生成测试交易信号
+function generateTestSignals(data) {
+  const signals = [];
+  for (let i = 5; i < data.length - 5; i += 10) {
+    signals.push({
+      index: i,
+      type: 'buy',
+      price: data[i].close,
+      shares: 1000,
+      time: data[i].time
+    });
+    signals.push({
+      index: i + 5,
+      type: 'sell',
+      price: data[i + 5].close,
+      shares: 1000,
+      time: data[i + 5].time
+    });
+  }
+  return signals;
+}
+
+let chart = null;
+
+function runTest() {
+  if (!chart) {
+    chart = new KLineChart('kline-canvas');
+  }
+  
+  const data = generateTestData(100);
+  chart.setData(data);
+  
+  const signals = generateTestSignals(data);
+  chart.setTradeSignals(signals);
+  
+  // 显示交易记录
+  const logEl = document.getElementById('trades-log');
+  logEl.innerHTML = '交易记录：\n';
+  signals.forEach((s, i) => {
+    logEl.innerHTML += `${i + 1}. [${s.type.toUpperCase()}] 日期: ${s.time}, 价格: ${s.price.toFixed(2)}, 数量: ${s.shares}\n`;
+  });
+}
+
+function clearChart() {
+  if (chart) {
+    chart.setData([]);
+    chart.setTradeSignals([]);
+  }
+  document.getElementById('trades-log').innerHTML = '';
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>量化回测系统 v0.7</title>
+<style>
+/* ========== 全局样式 ========== */
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  min-height:100vh;
+  padding:10px;
+  color:#333;
+}
+
+/* ========== 头部 ========== */
+.header{
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(10px);
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:15px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.1);
+}
+.header h1{
+  font-size:24px;
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  margin-bottom:8px;
+  font-weight:700;
+}
+
+/* ========== 卡片 ========== */
+.card{
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(10px);
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:15px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.1);
+}
+
+/* ========== 输入框和按钮 ========== */
+.input-group{display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;}
+input[type=text]{
+  flex:1;
+  padding:12px 16px;
+  border:2px solid #e0e0e0;
+  border-radius:12px;
+  font-size:15px;
+  min-width:200px;
+}
+button{padding:12px 24px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.3s;}
+.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;}
+.btn-success{background:#22c55e;color:#fff;}
+.btn-warning{background:#f59e0b;color:#fff;}
+.btn-default{background:#f0f0f0;color:#666;}
+
+/* ========== K线图容器 ========== */
+#chart-wrap{
+  width:100%;
+  height:400px;
+  background:#fafafa;
+  border:2px solid #e0e0e0;
+  border-radius:12px;
+  position:relative;
+  overflow:hidden;
+}
+
+/* ========== 响应式 ========== */
+@media(max-width:768px){
+  .input-group{flex-direction:column;}
+  input[type=text]{min-width:100%;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📈 量化回测系统 v0.7</h1>
+  <p id="header-status">Pure Frontend · Free Hosting · WeChat Ready</p>
+</div>
+
+<div class="card">
+  <div class="input-group">
+    <input type="text" id="code" placeholder="输入股票代码，如 sh600000" value="sh600000">
+    <button class="btn-primary" onclick="loadData()">📊 加载数据</button>
+    <button class="btn-success" onclick="startUpdate()" id="update-btn">▶️ 实时更新</button>
+    <button class="btn-warning" onclick="testUpdate()">🧪 测试一次</button>
+  </div>
+  <div id="quote" style="display:none;"></div>
+</div>
+
+<div class="card">
+  <div id="chart-wrap">
+    <canvas id="kline-canvas"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📋 调试日志</h3>
+  <div id="log" style="background:#1e1e1e;color:#0f0;padding:10px;border-radius:8px;font-family:monospace;font-size:12px;max-height:200px;overflow-y:auto;"></div>
+</div>
+
+<script>
+// ========== 全局变量 ==========
+let chart = null;
+let updateInterval = null;
+let updateCount = 0;
+
+// ========== 日志函数 ==========
+function log(msg) {
+  const logEl = document.getElementById('log');
+  const time = new Date().toLocaleTimeString();
+  logEl.innerHTML += `[${time}] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+  console.log(msg);
+}
+
+// ========== K线图类 ==========
+class KLineChart {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.data = [];
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    log('✅ KLineChart 初始化完成');
+  }
+  
+  resize() {
+    const wrap = document.getElementById('chart-wrap');
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = wrap.clientWidth * dpr;
+    this.canvas.height = wrap.clientHeight * dpr;
+    this.canvas.style.width = wrap.clientWidth + 'px';
+    this.canvas.style.height = wrap.clientHeight + 'px';
+    this.dpr = dpr;
+    this.render();
+  }
+  
+  setData(data) { 
+    this.data = data; 
+    log(`📊 设置数据：${data.length} 个数据点`);
+    this.render(); 
+  }
+  
+  render() {
+    if (!this.data.length) {
+      log('⚠️ 无数据，跳过渲染');
+      return;
+    }
+    
+    const ctx = this.ctx;
+    const dpr = this.dpr || 1;
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    
+    log(`🎨 开始渲染：最后价格=${this.data[this.data.length-1].close.toFixed(2)}`);
+    
+    // 清除整个Canvas
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(0, 0, W, H);
+    
+    // 计算价格范围
+    let minP = Infinity, maxP = -Infinity;
+    for (const d of this.data) {
+      if (d.low < minP) minP = d.low;
+      if (d.high > maxP) maxP = d.high;
+    }
+    minP = minP * 0.99;
+    maxP = maxP * 1.01;
+    
+    const padL = 60 * dpr;
+    const padR = 20 * dpr;
+    const padT = 20 * dpr;
+    const padB = 30 * dpr;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+    const volH = chartH * 0.2;
+    const priceH = chartH - volH;
+    
+    const barW = chartW / this.data.length;
+    
+    // 绘制网格
+    ctx.strokeStyle = '#f0f0f0';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (priceH * i / 4);
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(W - padR, y);
+      ctx.stroke();
+    }
+    
+    // 绘制K线和成交量
+    const maxVol = Math.max(...this.data.map(d => d.volume));
+    
+    for (let i = 0; i < this.data.length; i++) {
+      const d = this.data[i];
+      const x = padL + (i + 0.5) * barW;
+      const isUp = d.close >= d.open;
+      const color = isUp ? '#ef5350' : '#26a69a';
+      
+      ctx.strokeStyle = color;
+      
+      // 上下影线
+      const yHigh = padT + (maxP - d.high) / (maxP - minP) * priceH;
+      const yLow = padT + (maxP - d.low) / (maxP - minP) * priceH;
+      ctx.beginPath();
+      ctx.moveTo(x, yHigh);
+      ctx.lineTo(x, yLow);
+      ctx.stroke();
+      
+      // K线实体
+      const yOpen = padT + (maxP - d.open) / (maxP - minP) * priceH;
+      const yClose = padT + (maxP - d.close) / (maxP - minP) * priceH;
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyH = Math.max(2 * dpr, Math.abs(yOpen - yClose));
+      
+      ctx.fillStyle = color;
+      ctx.fillRect(x - barW * 0.4, bodyTop, barW * 0.8, bodyH);
+    }
+    
+    log(`✅ 渲染完成`);
+  }
+}
+
+// ========== 数据生成 ==========
+function generateData(days=100) {
+  const data = [];
+  let price = 10.0;
+  for (let i=0; i<days; i++) {
+    const o = price;
+    const c = o + (Math.random()-0.48)*0.5;
+    const h = Math.max(o,c) + Math.random()*0.3;
+    const l = Math.min(o,c) - Math.random()*0.3;
+    const v = Math.floor(Math.random()*5000000+1000000);
+    data.push({time:'2026-05-03',open:o,high:h,low:l,close:c,volume:v});
+    price = c;
+  }
+  return data;
+}
+
+// ========== 加载数据 ==========
+function loadData() {
+  log('📊 加载数据中...');
+  
+  if (!chart) {
+    chart = new KLineChart('kline-canvas');
+  }
+  
+  const kdata = generateData(100);
+  chart.setData(kdata);
+  
+  // 更新行情显示
+  const last = kdata[kdata.length-1];
+  document.getElementById('quote').style.display = 'block';
+  document.getElementById('quote').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:10px;">
+      <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+        <div style="font-size:11px;color:#888;">最新价</div>
+        <div style="font-size:18px;font-weight:bold;color:${last.close >= last.open ? '#ef5350' : '#26a69a'}">${last.close.toFixed(2)}</div>
+      </div>
+      <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+        <div style="font-size:11px;color:#888;">成交量</div>
+        <div style="font-size:18px;font-weight:bold;">${(last.volume/10000).toFixed(0)}万</div>
+      </div>
+    </div>`;
+  
+  log(`✅ 数据加载完成：最后价格=${last.close.toFixed(2)}`);
+}
+
+// ========== 测试更新一次 ==========
+function testUpdate() {
+  log('🧪 手动测试更新...');
+  
+  if (!chart || !chart.data || chart.data.length === 0) {
+    alert('请先点击"加载数据"！');
+    return;
+  }
+  
+  updateOnce();
+}
+
+// ========== 更新一次 ==========
+function updateOnce() {
+  if (!chart || !chart.data || chart.data.length === 0) {
+    log('❌ 无数据，跳过更新');
+    return false;
+  }
+  
+  const lastIndex = chart.data.length - 1;
+  const last = chart.data[lastIndex];
+  
+  // 生成新的价格（小幅波动）
+  const change = (Math.random() - 0.5) * 0.05;
+  const newPrice = last.close + change;
+  const newHigh = Math.max(last.high, newPrice) + Math.random() * 0.02;
+  const newLow = Math.min(last.low, newPrice) - Math.random() * 0.02;
+  const newVolume = last.volume + Math.floor(Math.random() * 50000);
+  
+  // 更新最后一个数据点
+  chart.data[lastIndex] = {
+    time: last.time,
+    open: last.open,
+    high: newHigh,
+    low: newLow,
+    close: newPrice,
+    volume: newVolume
+  };
+  
+  updateCount++;
+  
+  // 重新渲染图表
+  chart.render();
+  
+  // 更新行情显示
+  const prev = chart.data[lastIndex - 1];
+  if (prev) {
+    const change2 = newPrice - prev.close;
+    const isUp = change2 >= 0;
+    document.getElementById('quote').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:10px;">
+        <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+          <div style="font-size:11px;color:#888;">最新价</div>
+          <div style="font-size:18px;font-weight:bold;color:${isUp ? '#ef5350' : '#26a69a'}">${newPrice.toFixed(2)}</div>
+        </div>
+        <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+          <div style="font-size:11px;color:#888;">涨跌幅</div>
+          <div style="font-size:18px;font-weight:bold;color:${isUp ? '#ef5350' : '#26a69a'}">${isUp?'+':''}${(change2/prev.close*100).toFixed(2)}%</div>
+        </div>
+        <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+          <div style="font-size:11px;color:#888;">成交量</div>
+          <div style="font-size:18px;font-weight:bold;">${(newVolume/10000).toFixed(0)}万</div>
+        </div>
+      </div>`;
+  }
+  
+  log(`🔄 第 ${updateCount} 次更新：价格 ${newPrice.toFixed(2)} (${change >= 0 ? '+' : ''}${change.toFixed(3)})`);
+  
+  return true;
+}
+
+// ========== 开始实时更新 ==========
+function startUpdate() {
+  if (!chart || !chart.data || chart.data.length === 0) {
+    alert('请先点击"加载数据"！');
+    return;
+  }
+  
+  if (updateInterval) {
+    // 停止更新
+    clearInterval(updateInterval);
+    updateInterval = null;
+    document.getElementById('update-btn').innerHTML = '▶️ 实时更新';
+    document.getElementById('update-btn').className = 'btn-success';
+    document.getElementById('header-status').innerHTML = 'Pure Frontend · Free Hosting · WeChat Ready';
+    log('⏸️ 已停止更新');
+    return;
+  }
+  
+  log('▶️ 开始实时更新（每3秒）...');
+  updateInterval = setInterval(updateOnce, 3000);
+  document.getElementById('update-btn').innerHTML = '⏸️ 停止更新';
+  document.getElementById('update-btn').className = 'btn-warning';
+  document.getElementById('header-status').innerHTML = 'Pure Frontend · Free Hosting · WeChat Ready · <span style="color:#22c55e;">● 实时更新中...</span>';
+}
+
+// ========== 页面加载时初始化 ==========
+window.onload = function() {
+  log('🚀 页面加载完成');
+  loadData();
+};
+</script>
+</body>
+</html>

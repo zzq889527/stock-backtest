@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>量化回测系统 Pro</title>
+<style>
+/* ========== 全局样式 ========== */
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  min-height:100vh;
+  padding:10px;
+  color:#333;
+}
+
+/* ========== 头部 ========== */
+.header{
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(10px);
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:15px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.1);
+}
+.header h1{
+  font-size:24px;
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  margin-bottom:8px;
+  font-weight:700;
+}
+
+/* ========== 卡片 ========== */
+.card{
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(10px);
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:15px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.1);
+}
+
+/* ========== 输入框和按钮 ========== */
+.input-group{display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;}
+input[type=text]{
+  flex:1;
+  padding:12px 16px;
+  border:2px solid #e0e0e0;
+  border-radius:12px;
+  font-size:15px;
+  min-width:200px;
+}
+button{padding:12px 24px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.3s;}
+.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;}
+.btn-success{background:#22c55e;color:#fff;}
+.btn-warning{background:#f59e0b;color:#fff;}
+.btn-default{background:#f0f0f0;color:#666;}
+
+/* ========== 标签栏 ========== */
+.tab-bar{
+  display:flex;
+  gap:8px;
+  margin-bottom:20px;
+  background:#f0f0f0;
+  padding:4px;
+  border-radius:12px;
+}
+.tab-bar button{
+  flex:1;
+  padding:10px;
+  border:none;
+  border-radius:10px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all 0.3s;
+  background:transparent;
+  color:#666;
+}
+.tab-bar button.active{
+  background:#fff;
+  color:#667eea;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* ========== K线图容器 ========== */
+#chart-wrap{
+  width:100%;
+  height:400px;
+  background:#fafafa;
+  border:2px solid #e0e0e0;
+  border-radius:12px;
+  position:relative;
+  overflow:hidden;
+}
+
+/* ========== 指标按钮 ========== */
+.indicator-bar{
+  display:flex;
+  gap:8px;
+  margin-top:12px;
+  flex-wrap:wrap;
+}
+.indicator-btn{
+  padding:6px 12px;
+  border:2px solid #e0e0e0;
+  border-radius:8px;
+  background:#fff;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all 0.3s;
+  color:#666;
+}
+.indicator-btn.active{
+  border-color:#667eea;
+  color:#667eea;
+  background:#f0f4ff;
+}
+
+/* ========== 响应式 ========== */
+@media(max-width:768px){
+  .input-group{flex-direction:column;}
+  input[type=text]{min-width:100%;}
+  #chart-wrap{height:300px;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📈 量化回测系统 Pro</h1>
+  <p id="header-status">Pure Frontend · Free Hosting · WeChat Ready</p>
+</div>
+
+<div class="card">
+  <div class="input-group">
+    <input type="text" id="code" placeholder="输入股票代码，如 sh600000" value="sh600000" onchange="saveConfig()">
+    <button class="btn-primary" onclick="loadData()">📊 加载数据</button>
+    <button class="btn-success" onclick="toggleUpdate()" id="update-btn">▶️ 实时更新</button>
+    <button class="btn-warning" onclick="testUpdate()">🧪 测试</button>
+  </div>
+  <div id="quote" style="display:none;"></div>
+</div>
+
+<div class="card">
+  <div class="tab-bar">
+    <button class="active" onclick="switchTab('kline')">📊 K线图</button>
+    <button onclick="switchTab('backtest')">🎯 回测</button>
+    <button onclick="switchTab('fundamental')">📈 基本面</button>
+  </div>
+  
+  <div id="tab-kline">
+    <div id="chart-wrap">
+      <canvas id="kline-canvas"></canvas>
+    </div>
+    <div class="indicator-bar">
+      <button class="indicator-btn active" onclick="toggleIndicator('ma')" id="btn-ma">MA</button>
+      <button class="indicator-btn" onclick="toggleIndicator('macd')" id="btn-macd">MACD</button>
+      <button class="indicator-btn" onclick="toggleIndicator('rsi')" id="btn-rsi">RSI</button>
+      <button class="indicator-btn" onclick="toggleIndicator('kdj')" id="btn-kdj">KDJ</button>
+      <button class="indicator-btn" onclick="toggleIndicator('boll')" id="btn-boll">BOLL</button>
+    </div>
+  </div>
+  
+  <div id="tab-backtest" style="display:none;">
+    <h3 style="margin-bottom:15px;font-size:18px;">🎯 策略回测</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;">
+      <div>
+        <label style="font-size:13px;color:#666;margin-bottom:6px;display:block;">策略选择</label>
+        <select id="strategy" style="width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;background:#f8f9fa;" onchange="saveConfig()">
+          <option value="dual-ma">双均线策略</option>
+          <option value="macd">MACD策略</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:13px;color:#666;margin-bottom:6px;display:block;">初始资金</label>
+        <input type="number" id="capital" value="100000" style="width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;background:#f8f9fa;" onchange="saveConfig()">
+      </div>
+    </div>
+    <button class="btn-primary" style="width:100%;" onclick="runBacktest()">🚀 运行回测</button>
+    <div id="backtest-result" style="margin-top:20px;"></div>
+  </div>
+  
+  <div id="tab-fundamental" style="display:none;">
+    <h3 style="margin-bottom:15px;font-size:18px;">📈 基本面数据</h3>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px;">
+      <div style="background:#f8f9f9;padding:16px;border-radius:12px;cursor:pointer;" onclick="showFundamental('pe')">
+        <div style="font-size:12px;color:#888;">PE (TTM)</div>
+        <div style="font-size:20px;font-weight:700;" id="pe-value">--</div>
+        <div style="font-size:12px;color:#16a34a;" id="pe-pct">分位：--</div>
+      </div>
+      <div style="background:#f8f9f9;padding:16px;border-radius:12px;cursor:pointer;" onclick="showFundamental('pb')">
+        <div style="font-size:12px;color:#888;">PB</div>
+        <div style="font-size:20px;font-weight:700;" id="pb-value">--</div>
+        <div style="font-size:12px;color:#16a34a;" id="pb-pct">分位：--</div>
+      </div>
+      <div style="background:#f8f9f9;padding:16px;border-radius:12px;cursor:pointer;" onclick="showFundamental('roe')">
+        <div style="font-size:12px;color:#888;">ROE</div>
+        <div style="font-size:20px;font-weight:700;" id="roe-value">--</div>
+        <div style="font-size:12px;color:#ca8a04;" id="roe-pct">分位：--</div>
+      </div>
+      <div style="background:#f8f9f9;padding:16px;border-radius:12px;cursor:pointer;" onclick="showFundamental('dy')">
+        <div style="font-size:12px;color:#888;">股息率</div>
+        <div style="font-size:20px;font-weight:700;" id="dy-value">--</div>
+        <div style="font-size:12px;color:#dc2626;" id="dy-pct">分位：--</div>
+      </div>
+    </div>
+    <canvas id="fund-chart" width="560" height="300" style="display:block;margin:20px auto;background:#fafafa;border-radius:12px;padding:10px;"></canvas>
+    <div id="fund-pct-bar" style="max-width:500px;margin:20px auto;"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📋 调试日志</h3>
+  <div id="log" style="background:#1e1e1e;color:#0f0;padding:10px;border-radius:8px;font-family:monospace;font-size:12px;max-height:200px;overflow-y:auto;margin-top:10px;"></div>
+</div>
+
+<script src="js/indicators.js"></script>
+<script>
+// ========== 全局变量 ==========
+let chart = null;
+let updateInterval = null;
+let updateCount = 0;
+let currentFundKey = 'pe';  // 当前显示的基本面指标
+let activeIndicators = {'ma': true};  // 当前激活的指标
+
+// ========== 数据持久化 ==========
+const STORAGE_KEY = 'stock-backtest-config';
+
+function saveConfig() {
+  const config = {
+    code: document.getElementById('code').value,
+    strategy: document.getElementById('strategy').value,
+    capital: document.getElementById('capital').value,
+    activeIndicators: {...activeIndicators}
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  log('💾 配置已保存');
+}
+
+function loadConfig() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return null;
+  
+  try {
+    const config = JSON.parse(saved);
+    log('📂 已加载保存的配置');
+    
+    // 恢复表单值
+    if (config.code) document.getElementById('code').value = config.code;
+    if (config.strategy) document.getElementById('strategy').value = config.strategy;
+    if (config.capital) document.getElementById('capital').value = config.capital;
+    
+    // 恢复指标按钮状态
+    if (config.activeIndicators) {
+      activeIndicators = config.activeIndicators;
+      ['ma', 'macd', 'rsi', 'kdj', 'boll'].forEach(name => {
+        const btn = document.getElementById('btn-' + name);
+        if (btn) {
+          if (activeIndicators[name]) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        }
+      });
+    }
+    
+    return config;
+  } catch (e) {
+    log('❌ 加载配置失败：' + e.message);
+    return null;
+  }
+}
+
+// ========== 日志函数 ==========
+function log(msg) {
+  const logEl = document.getElementById('log');
+  const time = new Date().toLocaleTimeString();
+  logEl.innerHTML += `[${time}] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+  console.log(msg);
+}
+
+// ========== 切换指标显示 ==========
+function toggleIndicator(name) {
+  if (activeIndicators[name]) {
+    delete activeIndicators[name];
+    document.getElementById('btn-' + name).classList.remove('active');
+  } else {
+    activeIndicators[name] = true;
+    document.getElementById('btn-' + name).classList.add('active');
+  }
+  log(`📊 指标切换：${name} = ${activeIndicators[name] ? '开' : '关'}`);
+  saveConfig();  // 自动保存
+  if (chart) chart.render();
+}
+
+// ========== K线图类 ==========
+class KLineChart {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.data = [];
+    this.indicators = {};  // 存储计算后的指标数据
+    this.tradeSignals = [];  // 交易信号数组
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    log('✅ KLineChart 初始化完成');
+  }
+  
+  resize() {
+    const wrap = document.getElementById('chart-wrap');
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = wrap.clientWidth * dpr;
+    this.canvas.height = wrap.clientHeight * dpr;
+    this.canvas.style.width = wrap.clientWidth + 'px';
+    this.canvas.style.height = wrap.clientHeight + 'px';
+    this.dpr = dpr;
+    this.render();
+  }
+  
+  setData(data) { 
+    this.data = data; 
+    this.tradeSignals = [];  // 清除旧信号
+    log(`📊 设置数据：${data.length} 个数据点`);
+    // 计算所有技术指标
+    if (typeof calcAllIndicators === 'function') {
+      this.indicators = calcAllIndicators(data);
+      log('✅ 技术指标计算完成');
+    }
+    this.render(); 
+  }
+  
+  // 设置交易信号
+  setTradeSignals(signals) {
+    this.tradeSignals = signals;
+    log(`🎯 设置交易信号：${signals.length} 个`);
+    this.render();
+  }
+  
+  render() {
+    if (!this.data.length) {
+      log('⚠️ 无数据，跳过渲染');
+      return;
+    }
+    
+    const ctx = this.ctx;
+    const dpr = this.dpr || 1;
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    
+    // 清除整个Canvas
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(0, 0, W, H);
+    
+    const padL = 60 * dpr;
+    const padR = 20 * dpr;
+    const padT = 20 * dpr;
+    const padB = 30 * dpr;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+    const volH = chartH * 0.2;
+    const priceH = chartH - volH;
+    
+    // 计算价格范围（包含BOLL指标）
+    let minP = Infinity, maxP = -Infinity;
+    for (const d of this.data) {
+      if (d.low < minP) minP = d.low;
+      if (d.high > maxP) maxP = d.high;
+    }
+    // 如果有BOLL指标，扩展价格范围
+    if (this.indicators.boll) {
+      for (let i = 0; i < this.data.length; i++) {
+        if (this.indicators.boll.upper[i] && this.indicators.boll.upper[i] > maxP) {
+          maxP = this.indicators.boll.upper[i];
+        }
+        if (this.indicators.boll.lower[i] && this.indicators.boll.lower[i] < minP) {
+          minP = this.indicators.boll.lower[i];
+        }
+      }
+    }
+    minP = minP * 0.99;
+    maxP = maxP * 1.01;
+    
+    const barW = chartW / this.data.length;
+    
+    // 绘制网格
+    ctx.strokeStyle = '#f0f0f0';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#999';
+    ctx.font = (11 * dpr) + 'px sans-serif';
+    ctx.textAlign = 'right';
+    
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (priceH * i / 4);
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(W - padR, y);
+      ctx.stroke();
+      
+      const p = maxP - (maxP - minP) * i / 4;
+      ctx.fillText(p.toFixed(2), padL - 4 * dpr, y + 4 * dpr);
+    }
+    
+    // 绘制K线和成交量
+    const maxVol = Math.max(...this.data.map(d => d.volume));
+    
+    for (let i = 0; i < this.data.length; i++) {
+      const d = this.data[i];
+      const x = padL + (i + 0.5) * barW;
+      const isUp = d.close >= d.open;
+      const color = isUp ? '#ef5350' : '#26a69a';
+      
+      ctx.strokeStyle = color;
+      
+      // 上下影线
+      const yHigh = padT + (maxP - d.high) / (maxP - minP) * priceH;
+      const yLow = padT + (maxP - d.low) / (maxP - minP) * priceH;
+      ctx.beginPath();
+      ctx.moveTo(x, yHigh);
+      ctx.lineTo(x, yLow);
+      ctx.stroke();
+      
+      // K线实体
+      const yOpen = padT + (maxP - d.open) / (maxP - minP) * priceH;
+      const yClose = padT + (maxP - d.close) / (maxP - minP) * priceH;
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyH = Math.max(2 * dpr, Math.abs(yOpen - yClose));
+      
+      ctx.fillStyle = color;
+      ctx.fillRect(x - barW * 0.4, bodyTop, barW * 0.8, bodyH);
+      
+      // 成交量
+      const volY = padT + priceH + (d.volume / maxVol) * volH;
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(x - barW * 0.4, volY, barW * 0.8, padT + chartH - volY);
+      ctx.globalAlpha = 1.0;
+    }
+    
+    // 绘制技术指标
+    this.drawIndicators(padL, padT, priceH, chartW, barW, minP, maxP);
+    
+    // 绘制交易信号
+    this.drawTradeSignals(padL, padT, priceH, barW, minP, maxP);
+    
+    log(`✅ 渲染完成：最后价格=${this.data[this.data.length-1].close.toFixed(2)}`);
+  }
+  
+  drawTradeSignals(padL, padT, priceH, barW, minP, maxP) {
+    if (!this.tradeSignals || this.tradeSignals.length === 0) return;
+    
+    const ctx = this.ctx;
+    const dpr = this.dpr || 1;
+    
+    this.tradeSignals.forEach(signal => {
+      const x = padL + (signal.index + 0.5) * barW;
+      const y = padT + (maxP - signal.price) / (maxP - minP) * priceH;
+      
+      ctx.fillStyle = signal.type === 'buy' ? '#22c55e' : '#ef5350';
+      ctx.font = `${14 * dpr}px sans-serif`;
+      ctx.textAlign = 'center';
+      
+      if (signal.type === 'buy') {
+        // 买入箭头（向上箭头）
+        ctx.beginPath();
+        ctx.moveTo(x, y - 15 * dpr);
+        ctx.lineTo(x - 8 * dpr, y - 3 * dpr);
+        ctx.lineTo(x + 8 * dpr, y - 3 * dpr);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillText('B', x, y - 18 * dpr);
+      } else {
+        // 卖出箭头（向下箭头）
+        ctx.beginPath();
+        ctx.moveTo(x, y + 15 * dpr);
+        ctx.lineTo(x - 8 * dpr, y + 3 * dpr);
+        ctx.lineTo(x + 8 * dpr, y + 3 * dpr);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillText('S', x, y + 28 * dpr);
+      }
+    });
+    
+    log(`✅ 绘制交易信号：${this.tradeSignals.length} 个`);
+  }
+  
+  drawIndicators(padL, padT, priceH, chartW, barW, minP, maxP) {
+    const ctx = this.ctx;
+    const dpr = this.dpr || 1;
+    
+    // 绘制MA指标
+    if (activeIndicators['ma'] && this.indicators.ma5) {
+      ctx.lineWidth = 1.5 * dpr;
+      
+      // MA5
+      ctx.strokeStyle = '#f59e0b';
+      ctx.beginPath();
+      for (let i = 0; i < this.data.length; i++) {
+        if (this.indicators.ma5[i] !== null) {
+          const x = padL + (i + 0.5) * barW;
+          const y = padT + (maxP - this.indicators.ma5[i]) / (maxP - minP) * priceH;
+          if (i === 0 || this.indicators.ma5[i-1] === null) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      
+      // MA10
+      ctx.strokeStyle = '#3b82f6';
+      ctx.beginPath();
+      for (let i = 0; i < this.data.length; i++) {
+        if (this.indicators.ma10[i] !== null) {
+          const x = padL + (i + 0.5) * barW;
+          const y = padT + (maxP - this.indicators.ma10[i]) / (maxP - minP) * priceH;
+          if (i === 0 || this.indicators.ma10[i-1] === null) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      
+      // MA20
+      ctx.strokeStyle = '#ef5350';
+      ctx.beginPath();
+      for (let i = 0; i < this.data.length; i++) {
+        if (this.indicators.ma20[i] !== null) {
+          const x = padL + (i + 0.5) * barW;
+          const y = padT + (maxP - this.indicators.ma20[i]) / (maxP - minP) * priceH;
+          if (i === 0 || this.indicators.ma20[i-1] === null) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+    }
+    
+    // 绘制BOLL指标
+    if (activeIndicators['boll'] && this.indicators.boll) {
+      ctx.lineWidth = 1.5 * dpr;
+      
+      // 上轨
+      ctx.strokeStyle = '#8b5cf6';
+      ctx.beginPath();
+      for (let i = 0; i < this.data.length; i++) {
+        if (this.indicators.boll.upper[i] !== null) {
+          const x = padL + (i + 0.5) * barW;
+          const y = padT + (maxP - this.indicators.boll.upper[i]) / (maxP - minP) * priceH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      
+      // 中轨
+      ctx.strokeStyle = '#a78bfa';
+      ctx.beginPath();
+      for (let i = 0; i < this.data.length; i++) {
+        if (this.indicators.boll.mid[i] !== null) {
+          const x = padL + (i + 0.5) * barW;
+          const y = padT + (maxP - this.indicators.boll.mid[i]) / (maxP - minP) * priceH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      
+      // 下轨
+      ctx.strokeStyle = '#8b5cf6';
+      ctx.beginPath();
+      for (let i = 0; i < this.data.length; i++) {
+        if (this.indicators.boll.lower[i] !== null) {
+          const x = padL + (i + 0.5) * barW;
+          const y = padT + (maxP - this.indicators.boll.lower[i]) / (maxP - minP) * priceH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+    }
+  }
+}
+
+// ========== 数据生成 ==========
+function generateData(days=100) {
+  const data = [];
+  let price = 10.0;
+  for (let i=0; i<days; i++) {
+    const o = price;
+    const c = o + (Math.random()-0.48)*0.5;
+    const h = Math.max(o,c) + Math.random()*0.3;
+    const l = Math.min(o,c) - Math.random()*0.3;
+    const v = Math.floor(Math.random()*5000000+1000000);
+    data.push({time:'2026-05-03',open:o,high:h,low:l,close:c,volume:v});
+    price = c;
+  }
+  return data;
+}
+
+// ========== 加载数据 ==========
+function loadData() {
+  log('📊 加载数据中...');
+  
+  if (!chart) {
+    chart = new KLineChart('kline-canvas');
+  }
+  
+  const kdata = generateData(100);
+  chart.setData(kdata);
+  
+  // 更新行情显示
+  const last = kdata[kdata.length-1];
+  document.getElementById('quote').style.display = 'block';
+  document.getElementById('quote').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:10px;">
+      <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+        <div style="font-size:11px;color:#888;">最新价</div>
+        <div style="font-size:18px;font-weight:bold;color:${last.close >= last.open ? '#ef5350' : '#26a69a'}">${last.close.toFixed(2)}</div>
+      </div>
+      <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+        <div style="font-size:11px;color:#888;">成交量</div>
+        <div style="font-size:18px;font-weight:bold;">${(last.volume/10000).toFixed(0)}万</div>
+      </div>
+    </div>`;
+  
+  log(`✅ 数据加载完成：最后价格=${last.close.toFixed(2)}`);
+}
+
+// ========== 切换标签 ==========
+function switchTab(tab) {
+  document.getElementById('tab-kline').style.display = tab==='kline'?'block':'none';
+  document.getElementById('tab-backtest').style.display = tab==='backtest'?'block':'none';
+  document.getElementById('tab-fundamental').style.display = tab==='fundamental'?'block':'none';
+  const btns = document.querySelectorAll('.tab-bar button');
+  btns[0].className = tab==='kline'?'active':'';
+  btns[1].className = tab==='backtest'?'active':'';
+  btns[2].className = tab==='fundamental'?'active':'';
+  
+  // 切换到基本面标签时，自动加载数据
+  if (tab === 'fundamental') {
+    showFundamental(currentFundKey);
+  }
+}
+
+// ========== 测试更新一次 ==========
+function testUpdate() {
+  log('🧪 手动测试更新...');
+  updateOnce();
+}
+
+// ========== 更新一次 ==========
+function updateOnce() {
+  if (!chart || !chart.data || chart.data.length === 0) {
+    log('❌ 无数据，跳过更新');
+    return false;
+  }
+  
+  const lastIndex = chart.data.length - 1;
+  const last = chart.data[lastIndex];
+  
+  // 生成新的价格（小幅波动）
+  const change = (Math.random() - 0.5) * 0.05;
+  const newPrice = last.close + change;
+  const newHigh = Math.max(last.high, newPrice) + Math.random() * 0.02;
+  const newLow = Math.min(last.low, newPrice) - Math.random() * 0.02;
+  const newVolume = last.volume + Math.floor(Math.random() * 50000);
+  
+  // 更新最后一个数据点
+  chart.data[lastIndex] = {
+    time: last.time,
+    open: last.open,
+    high: newHigh,
+    low: newLow,
+    close: newPrice,
+    volume: newVolume
+  };
+  
+  updateCount++;
+  
+  // 重新计算技术指标
+  if (typeof calcAllIndicators === 'function') {
+    chart.indicators = calcAllIndicators(chart.data);
+  }
+  
+  // 重新渲染图表
+  chart.render();
+  
+  // 更新行情显示
+  const prev = chart.data[lastIndex - 1];
+  if (prev) {
+    const change2 = newPrice - prev.close;
+    const isUp = change2 >= 0;
+    document.getElementById('quote').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:10px;">
+        <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+          <div style="font-size:11px;color:#888;">最新价</div>
+          <div style="font-size:18px;font-weight:bold;color:${isUp ? '#ef5350' : '#26a69a'}">${newPrice.toFixed(2)}</div>
+        </div>
+        <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+          <div style="font-size:11px;color:#888;">涨跌幅</div>
+          <div style="font-size:18px;font-weight:bold;color:${isUp ? '#ef5350' : '#26a69a'}">${isUp?'+':''}${(change2/prev.close*100).toFixed(2)}%</div>
+        </div>
+        <div style="background:#f9f9f9;padding:10px;border-radius:8px;">
+          <div style="font-size:11px;color:#888;">成交量</div>
+          <div style="font-size:18px;font-weight:bold;">${(newVolume/10000).toFixed(0)}万</div>
+        </div>
+      </div>`;
+  }
+  
+  log(`🔄 第 ${updateCount} 次更新：价格 ${newPrice.toFixed(2)} (${change >= 0 ? '+' : ''}${change.toFixed(3)})`);
+  
+  return true;
+}
+
+// ========== 启动/停止实时更新 ==========
+function toggleUpdate() {
+  if (updateInterval) {
+    // 停止更新
+    clearInterval(updateInterval);
+    updateInterval = null;
+    document.getElementById('update-btn').innerHTML = '▶️ 实时更新';
+    document.getElementById('update-btn').className = 'btn-success';
+    document.getElementById('header-status').innerHTML = 'Pure Frontend · Free Hosting · WeChat Ready';
+    log('⏸️ 已停止更新');
+  } else {
+    // 启动更新
+    if (!chart || !chart.data || chart.data.length === 0) {
+      alert('请先点击"加载数据"！');
+      return;
+    }
+    log('▶️ 开始实时更新（每3秒）...');
+    updateInterval = setInterval(updateOnce, 3000);
+    document.getElementById('update-btn').innerHTML = '⏸️ 停止更新';
+    document.getElementById('update-btn').className = 'btn-warning';
+    document.getElementById('header-status').innerHTML = 'Pure Frontend · Free Hosting · WeChat Ready · <span style="color:#22c55e;">● 实时更新中...</span>';
+  }
+}
+
+// ========== 回测引擎 ==========
+class BacktestEngine {
+  run(kline, strategyFn, opts={}) {
+    const capital0 = opts.capital || 100000;
+    let cash = capital0, shares=0, value=capital0;
+    let maxValue=capital0, maxDrawdown=0;
+    const equity=[];
+    let wins=0, losses=0;
+    const trades = [];  // 新增：详细交易记录
+    
+    for (let i=0;i<kline.length;i++) {
+      const sig = strategyFn(kline, i);
+      const price = kline[i].close;
+      if (sig===1 && cash>0) {
+        const vol=Math.floor(cash*(1-0.0003)/price);
+        if (vol>0) { 
+          shares+=vol; 
+          cash-=vol*price*(1+0.0003); 
+          // 记录买入
+          trades.push({
+            index: i,
+            type: 'buy',
+            price: price,
+            shares: vol,
+            time: kline[i].time
+          });
+        }
+      } else if (sig===-1 && shares>0) {
+        cash+=shares*price*(1-0.0003 - 0.001);
+        if (price>=kline[i-1].close) wins++; else losses++;
+        // 记录卖出
+        trades.push({
+          index: i,
+          type: 'sell',
+          price: price,
+          shares: shares,
+          time: kline[i].time,
+          pnl: (price - trades.length > 0 ? trades[trades.length-1].price : 0) * shares
+        });
+        shares=0;
+      }
+      value = cash + shares*price;
+      if (value>maxValue) maxValue=value;
+      const dd = (maxValue-value)/maxValue*100;
+      if (dd>maxDrawdown) maxDrawdown=dd;
+      equity.push({time:kline[i].time, value});
+    }
+    
+    const totalRet = (value-capital0)/capital0*100;
+    const days = kline.length;
+    const annual = totalRet/365*days;
+    
+    return {
+      totalReturn: totalRet,
+      annualReturn: annual,
+      maxDrawdown: maxDrawdown,
+      sharpe: annual/15,
+      trades: wins+losses,
+      winRate: (wins+losses)>0 ? wins/(wins+losses)*100 : 0,
+      tradesDetail: trades,  // 新增：返回详细交易记录
+      equity: equity  // 新增：返回资金曲线
+    };
+  }
+}
+
+// ========== 双均线策略 ==========
+function dualMAStrategy(shortP, longP) {
+  return function(kline, i) {
+    if (i<longP) return 0;
+    
+    let s=0, l=0;
+    for (let j=i-shortP+1;j<=i;j++) s+=kline[j].close;
+    for (let j=i-longP+1;j<=i;j++) l+=kline[j].close;
+    const maS=s/shortP, maL=l/longP;
+    
+    let sPrev=0, lPrev=0;
+    for (let j=i-shortP;j<=i-1;j++) sPrev+=kline[j].close;
+    for (let j=i-longP;j<=i-1;j++) lPrev+=kline[j].close;
+    const maSPrev=sPrev/shortP, maLPrev=lPrev/longP;
+    
+    if (maSPrev <= maLPrev && maS > maL) return 1;
+    if (maSPrev >= maLPrev && maS < maL) return -1;
+    return 0;
+  };
+}
+
+// ========== 运行回测 ==========
+function runBacktest() {
+  if (!chart || !chart.data || chart.data.length === 0) {
+    alert('请先加载数据！');
+    return;
+  }
+  
+  const kdata = chart.data;
+  const strategyType = document.getElementById('strategy').value;
+  let strategyFn;
+  
+  if (strategyType==='dual-ma') {
+    strategyFn = dualMAStrategy(5, 20);
+  } else {
+    // MACD策略（简化版）
+    strategyFn = function(kline, i) {
+      if (i<26) return 0;
+      // 简化：价格站上MA20买入，跌破MA20卖出
+      const ma20 = kline.slice(i-19, i+1).reduce((a,b) => a+b.close, 0) / 20;
+      const ma20Prev = i>0 ? kline.slice(i-20, i).reduce((a,b) => a+b.close, 0) / 20 : ma20;
+      if (kline[i].close > ma20 && kline[i-1].close <= ma20Prev) return 1;
+      if (kline[i].close < ma20 && kline[i-1].close >= ma20Prev) return -1;
+      return 0;
+    };
+  }
+  
+  const capital = parseFloat(document.getElementById('capital').value) || 100000;
+  const engine = new BacktestEngine();
+  const result = engine.run(kdata, strategyFn, {capital});
+  
+  // 新增：将交易信号传递给K线图
+  if (chart && result.tradesDetail) {
+    chart.setTradeSignals(result.tradesDetail);
+  }
+  
+  document.getElementById('backtest-result').innerHTML = `
+    <div style="background:#f8f9f9;padding:20px;border-radius:12px;">
+      <h4 style="margin-bottom:15px;font-size:16px;">📊 回测结果</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+        <div style="background:#fff;padding:12px;border-radius:8px;">
+          <div style="font-size:12px;color:#888;">总收益率</div>
+          <div style="font-size:18px;font-weight:bold;color:${result.totalReturn>=0?'#ef5350':'#26a69a'}">${result.totalReturn.toFixed(2)}%</div>
+        </div>
+        <div style="background:#fff;padding:12px;border-radius:8px;">
+          <div style="font-size:12px;color:#888;">年化收益</div>
+          <div style="font-size:18px;font-weight:bold;">${result.annualReturn.toFixed(2)}%</div>
+        </div>
+        <div style="background:#fff;padding:12px;border-radius:8px;">
+          <div style="font-size:12px;color:#888;">最大回撤</div>
+          <div style="font-size:18px;font-weight:bold;color:#26a69a">${result.maxDrawdown.toFixed(2)}%</div>
+        </div>
+        <div style="background:#fff;padding:12px;border-radius:8px;">
+          <div style="font-size:12px;color:#888;">夏普比率</div>
+          <div style="font-size:18px;font-weight:bold;">${result.sharpe.toFixed(2)}</div>
+        </div>
+        <div style="background:#fff;padding:12px;border-radius:8px;">
+          <div style="font-size:12px;color:#888;">交易次数</div>
+          <div style="font-size:18px;font-weight:bold;">${result.trades}</div>
+        </div>
+        <div style="background:#fff;padding:12px;border-radius:8px;">
+          <div style="font-size:12px;color:#888;">胜率</div>
+          <div style="font-size:18px;font-weight:bold;">${result.winRate.toFixed(1)}%</div>
+        </div>
+      </div>
+    </div>`;
+  
+  log(`✅ 回测完成：总收益率=${result.totalReturn.toFixed(2)}%, 交易次数=${result.trades}`);
+}
+
+// ========== 基本面数据 ==========
+const fundData = {
+  'pe': {value: 15.20, pct: 45.2, history: []},
+  'pb': {value: 1.35, pct: 32.1, history: []},
+  'roe': {value: 12.5, pct: 58.3, history: []},
+  'dy': {value: 3.2, pct: 68.7, history: []},
+};
+
+// 生成历史数据
+function generateFundHistory() {
+  for (const key in fundData) {
+    const d = fundData[key];
+    d.history = [];
+    let val = d.value;
+    for (let i = 0; i < 24; i++) {
+      val += (Math.random() - 0.5) * d.value * 0.1;
+      d.history.push(val);
+    }
+  }
+}
+
+generateFundHistory();
+
+function showFundamental(key) {
+  currentFundKey = key;
+  log(`📈 显示基本面数据：${key}`);
+  
+  const d = fundData[key];
+  
+  // 更新显示值
+  document.getElementById('pe-value').textContent = fundData.pe.value.toFixed(2);
+  document.getElementById('pe-pct').textContent = `分位：${fundData.pe.pct}%`;
+  
+  document.getElementById('pb-value').textContent = fundData.pb.value.toFixed(2);
+  document.getElementById('pb-pct').textContent = `分位：${fundData.pb.pct}%`;
+  
+  document.getElementById('roe-value').textContent = fundData.roe.value.toFixed(1) + '%';
+  document.getElementById('roe-pct').textContent = `分位：${fundData.roe.pct}%`;
+  
+  document.getElementById('dy-value').textContent = fundData.dy.value.toFixed(1) + '%';
+  document.getElementById('dy-pct').textContent = `分位：${fundData.dy.pct}%`;
+  
+  // 绘制历史趋势图
+  drawFundChart(d.history, key);
+  
+  // 绘制分位值条
+  drawPctBar(d.pct);
+}
+
+function drawFundChart(history, title) {
+  const canvas = document.getElementById('fund-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = 560, H = 300;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+  
+  ctx.clearRect(0, 0, W, H);
+  
+  const padL = 60, padR = 20, padT = 20, padB = 40;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  
+  const minV = Math.min(...history) * 0.95;
+  const maxV = Math.max(...history) * 1.05;
+  
+  // 绘制网格
+  ctx.strokeStyle = '#f0f0f0';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#999';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'right';
+  
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (chartH * i / 4);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+    ctx.stroke();
+    
+    const v = maxV - (maxV - minV) * i / 4;
+    ctx.fillText(v.toFixed(2), padL - 4, y + 4);
+  }
+  
+  // 绘制折线
+  ctx.strokeStyle = '#667eea';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  
+  for (let i = 0; i < history.length; i++) {
+    const x = padL + (i / (history.length - 1)) * chartW;
+    const y = padT + (maxV - history[i]) / (maxV - minV) * chartH;
+    
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  
+  // 填充区域
+  ctx.fillStyle = 'rgba(102, 126, 234, 0.1)';
+  ctx.beginPath();
+  ctx.moveTo(padL, padT + chartH);
+  for (let i = 0; i < history.length; i++) {
+    const x = padL + (i / (history.length - 1)) * chartW;
+    const y = padT + (maxV - history[i]) / (maxV - minV) * chartH;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(padL + chartW, padT + chartH);
+  ctx.closePath();
+  ctx.fill();
+  
+  log(`✅ 基本面图表绘制完成：${title}`);
+}
+
+function drawPctBar(pct) {
+  const barEl = document.getElementById('fund-pct-bar');
+  if (!barEl) return;
+  
+  const color = pct <= 30 ? '#16a34a' : pct >= 70 ? '#dc2626' : '#ca8a04';
+  const label = pct <= 30 ? '低估' : pct >= 70 ? '高估' : '合理';
+  
+  barEl.innerHTML = `
+    <div style="font-size:14px;margin-bottom:8px;font-weight:600;">当前分位值：<b style="color:${color}">${pct}%</b> （${label}）</div>
+    <div style="background:#eee;border-radius:12px;height:24px;overflow:hidden;position:relative;">
+      <div style="background:linear-gradient(90deg,#16a34a,#22c55e);width:30%;height:100%;position:absolute;left:0;"></div>
+      <div style="background:linear-gradient(90deg,#ca8a04,#eab308);width:40%;height:100%;position:absolute;left:30%;"></div>
+      <div style="background:linear-gradient(90deg,#ef4444,#dc2626);width:30%;height:100%;position:absolute;left:70%;"></div>
+      <div style="position:absolute;left:${pct}%;top:50%;transform:translate(-50%,-50%);font-size:16px;color:${color};">▼</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:#999;margin-top:6px;">
+      <span>0%</span><span>30%</span><span>70%</span><span>100%</span>
+    </div>`;
+}
+
+// ========== 页面加载时初始化 ==========
+window.onload = function() {
+  log('🚀 页面加载完成');
+  loadConfig();  // 先加载保存的配置
+  loadData();    // 再加载数据
+};
+</script>
+</body>
+</html>
