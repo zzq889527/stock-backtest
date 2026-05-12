@@ -5,14 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>量化回测系统 Pro</title>
 
-<!-- Tailwind CSS (CDN) -->
-<script src="https://cdn.tailwindcss.com"></script>
+<!-- 协议提示 -->
+<div id="protocol-hint" style="display:none;position:fixed;top:0;left:0;width:100%;background:#238636;color:#fff;padding:10px 16px;z-index:9999;text-align:center;font-size:14px;line-height:1.6;">
+  ✅ 当前以 <b>file:// 协议</b> 打开，已加载内嵌真实K线数据（双击即用模式）
+</div>
+<script>
+  if (window.location.protocol === 'file:') {
+    document.getElementById('protocol-hint').style.display = 'block';
+    setTimeout(() => {
+      const el = document.getElementById('protocol-hint');
+      if (el) el.style.display = 'none';
+    }, 3000);
+  }
+</script>
 
-<!-- Vue 3 -->
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<!-- CDN加载失败提示（非阻塞） -->
+<div id="cdn-error" style="display:none;position:fixed;top:0;left:0;width:100%;background:#f85149;color:#fff;padding:12px 16px;z-index:9999;text-align:center;font-size:14px;"></div>
+<script>
+  setTimeout(() => {
+    const msgs = [];
+    if (typeof Vue === 'undefined') msgs.push('Vue 3 加载失败（CDN不可用）');
+    if (typeof LightweightCharts === 'undefined') msgs.push('Lightweight Charts 加载失败（CDN不可用）');
+    if (msgs.length > 0) {
+      const el = document.getElementById('cdn-error');
+      el.style.display = 'block';
+      el.innerHTML = '⚠️ ' + msgs.join('；') + '——请检查网络连接后刷新页面';
+    }
+  }, 5000);
+  // Vue挂载后隐藏错误提示
+  window.addEventListener('vue-mounted', () => {
+    const el = document.getElementById('cdn-error');
+    if (el) el.style.display = 'none';
+  });
+</script>
 
-<!-- TradingView Lightweight Charts -->
-<script src="https://unpkg.com/lightweight-charts@5.0.6/dist/lightweight-charts.standalone.production.js"></script>
+<!-- Vue 3 & Lightweight Charts —— 本地文件，零网络依赖 -->
+<script src="lib/vue.global.prod.js"></script>
+<script src="lib/lightweight-charts.5.0.6.js"></script>
 
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -278,6 +307,7 @@
   #kline-chart {
     width: 100%;
     height: 450px;
+    position: relative;
   }
 
   @media (max-width: 768px) {
@@ -607,9 +637,148 @@
     border-radius: 4px;
     color: var(--text-secondary);
   }
+
+  /* ========== 图表加载骨架屏 ========== */
+  .chart-loading-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 12px;
+    transition: opacity 0.3s ease;
+  }
+  .chart-loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .chart-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .chart-loading-text {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .chart-loading-progress {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+  }
+  .chart-loading-dots::after {
+    content: '';
+    animation: dots 1.5s steps(4, end) infinite;
+  }
+  @keyframes dots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+    100% { content: ''; }
+  }
+
+  /* ========== 骨架图闪烁 ========== */
+  .skeleton-chart {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px;
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 9;
+    pointer-events: none;
+  }
+  .skeleton-chart.hidden {
+    display: none;
+  }
+  .skeleton-line {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(88,166,255,0.15), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 2px;
+    margin-bottom: 4px;
+  }
+  .skeleton-line:nth-child(odd) {
+    animation-delay: 0.2s;
+    height: 1.5px;
+  }
+  .skeleton-candle {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+    height: 60%;
+    margin-bottom: 8px;
+  }
+  .skeleton-candle-bar {
+    flex: 1;
+    background: linear-gradient(180deg, rgba(248,81,73,0.08), rgba(63,185,80,0.08));
+    border-radius: 2px 2px 0 0;
+    animation: shimmer 2s infinite;
+    height: var(--h, 50%);
+    align-self: flex-end;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ========== 加载重试按钮 ========== */
+  .chart-retry-btn {
+    margin-top: 12px;
+    padding: 6px 16px;
+    border: 1px solid var(--accent-blue);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--accent-blue);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .chart-retry-btn:hover {
+    background: rgba(88,166,255,0.1);
+  }
+
+  /* ========== 数据过期的警告提示 ========== */
+  .data-warning {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(210,153,34,0.15);
+    color: var(--accent-orange);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    z-index: 5;
+    border: 1px solid rgba(210,153,34,0.3);
+  }
+  .data-warning.error {
+    background: rgba(248,81,73,0.15);
+    color: var(--accent-red);
+    border-color: rgba(248,81,73,0.3);
+  }
 </style>
 </head>
 <body>
+
+<!-- 加载提示：Vue挂载后自动移除 -->
+<div id="loading-splash" style="display:flex;justify-content:center;align-items:center;height:100vh;color:#c9d1d9;font-size:16px;background:#0d1117;position:fixed;top:0;left:0;width:100%;z-index:9999;">
+  ⏳ 正在加载量化回测系统...
+</div>
 
 <div id="app">
   <!-- 左侧导航栏 -->
@@ -726,7 +895,14 @@
       <!-- K线图 -->
       <div v-show="activeMainTab==='chart'">
         <div style="position:relative;">
-          <div id="kline-chart"></div>
+          <div id="kline-chart">
+            <div class="chart-loading-overlay" :class="{hidden: !chartLoading}">
+              <div class="chart-loading-spinner"></div>
+              <div class="chart-loading-text">正在加载K线数据<span class="chart-loading-dots"></span></div>
+              <div class="chart-loading-progress" v-if="chartLoadingMsg">{{ chartLoadingMsg }}</div>
+              <button class="chart-retry-btn" v-if="chartLoadFailed" @click="retryLoadStock">重试</button>
+            </div>
+          </div>
           <!-- 副图面板标题 -->
           <div class="subchart-label" style="top:52%;" v-show="indicators.find(i=>i.key==='macd'&&i.on)">MACD</div>
           <div class="subchart-label" style="top:78%;" v-show="indicators.find(i=>i.key==='rsi'&&i.on)">RSI</div>
@@ -892,10 +1068,26 @@
   </div>
 </div>
 
+<!-- 内嵌K线数据（file://协议下绕过CORS） -->
+<script src="embedded-data.js"></script>
+
 <!-- JS 模块加载顺序很重要 -->
 <script src="js/indicators.js"></script>
 <script src="js/backtest-engine.js"></script>
 <script src="js/app.js"></script>
+
+<script>
+  // Vue挂载后移除加载提示
+  window.addEventListener('vue-mounted', () => {
+    const splash = document.getElementById('loading-splash');
+    if (splash) { splash.style.opacity = '0'; splash.style.transition = 'opacity 0.3s'; setTimeout(() => splash.remove(), 300); }
+  });
+  // 超时保护：8秒后强制移除（避免Vue挂载异常时卡死）
+  setTimeout(() => {
+    const splash = document.getElementById('loading-splash');
+    if (splash) { splash.style.opacity = '0'; splash.style.transition = 'opacity 0.3s'; setTimeout(() => splash.remove(), 300); }
+  }, 8000);
+</script>
 
 </body>
 </html>

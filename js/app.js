@@ -68,6 +68,11 @@ createApp({
     ]);
     const activeFund = ref(null);
 
+    // 图表加载状态
+    const chartLoading = ref(false);
+    const chartLoadingMsg = ref('');
+    const chartLoadFailed = ref(false);
+
     // 图表实例
     let chart = null;
     let candleSeries = null;
@@ -120,31 +125,41 @@ createApp({
       loadStock();
     }
 
-    // =========== K线数据生成（备用）===========
-    function generateKline(days = 200) {
+    // =========== K线数据生成（增强版，覆盖更广历史）===========
+    function generateKline(days = 800) {
       const data = [];
-      let price = 10.0;
+      let price = 150.0;
       const baseDate = new Date();
-      baseDate.setDate(baseDate.getDate() - days);
-      for (let i = 0; i < days; i++) {
+      baseDate.setDate(baseDate.getDate() - Math.round(days * 1.4));
+      let tradingDayCount = 0;
+      const maxAttempts = days * 3;
+      let attempts = 0;
+      while (tradingDayCount < days && attempts < maxAttempts) {
+        attempts++;
         const d = new Date(baseDate);
-        d.setDate(d.getDate() + i);
+        d.setDate(d.getDate() + attempts);
         if (d.getDay() === 0 || d.getDay() === 6) continue;
+        const trend = Math.sin(attempts / 20) * 0.3;
+        const noise = (Math.random() - 0.48) * 0.8;
         const o = price;
-        const c = o + (Math.random() - 0.48) * 0.5;
-        const h = Math.max(o, c) + Math.random() * 0.3;
-        const l = Math.min(o, c) - Math.random() * 0.3;
-        const v = Math.floor(Math.random() * 5000000 + 1000000);
+        const change = trend + noise;
+        const c = Math.max(o * 0.9, o + change);
+        const h = Math.max(o, c) + Math.random() * 0.5;
+        const l = Math.min(o, c) - Math.random() * 0.5;
+        const v = Math.floor(Math.random() * 8000000 + 2000000);
         data.push({
           time:  d.toISOString().slice(0,10),
           open:  parseFloat(o.toFixed(2)),
           high:  parseFloat(h.toFixed(2)),
           low:   parseFloat(l.toFixed(2)),
           close: parseFloat(c.toFixed(2)),
-          volume:v,
+          volume: v,
         });
         price = c;
+        tradingDayCount++;
       }
+      data.sort((a, b) => a.time.localeCompare(b.time));
+      console.log(`[generateKline] 生成 ${data.length} 条模拟数据, 范围: ${data[0]?.time} ~ ${data[data.length-1]?.time}`);
       return data;
     }
 
@@ -175,8 +190,8 @@ createApp({
           },
           crosshair: { 
             mode: LightweightCharts.CrosshairMode.Normal,
-            vertLine: { color:'rgba(88,166,255,0.5)', width:1, style:2 },
-            horzLine: { color:'rgba(88,166,255,0.5)', width:1, style:2 }
+            vertLine: { visible:false },
+            horzLine: { visible:false }
           },
           rightPriceScale: { 
             borderColor:'#30363d', 
@@ -227,54 +242,72 @@ createApp({
       }
     }
 
-    // =========== 渲染图表 ===========
+    // =========== 渲染图表（优化版）===========
     function renderChart() {
-      if (!candleSeries) initChart();
-      
-      if (klineData.length === 0) {
-        klineData = generateKline(200);
+      try {
+        // 确保图表已初始化
+        if (!chart || !candleSeries) {
+          initChart();
+          // 如果初始化后仍没有，延迟重试
+          if (!candleSeries) {
+            console.warn('[renderChart] 图表未就绪，延迟重试');
+            setTimeout(() => renderChart(), 100);
+            return;
+          }
+        }
+
+        if (!klineData || klineData.length === 0) {
+          console.warn('[renderChart] 无数据，生成默认数据');
+          klineData = generateKline(800);
+        }
+
+        // 使用 requestAnimationFrame 确保UI流畅
+        requestAnimationFrame(() => {
+          try {
+            // 一次性加载所有数据（Lightweight Charts 处理几千条数据非常高效）
+            const candleData = klineData.map(d => ({
+              time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
+            }));
+            const volumeData = klineData.map(d => ({
+              time: d.time, value: d.volume,
+              color: d.close >= d.open ? 'rgba(248,81,73,0.3)' : 'rgba(63,185,80,0.3)'
+            }));
+
+            candleSeries.setData(candleData);
+            volumeSeries.setData(volumeData);
+
+            renderIndicators();
+
+            // 自动缩放到全部数据
+            if (chart) chart.timeScale().fitContent();
+
+            console.log(`[renderChart] 图表渲染成功: ${klineData.length}条, 范围: ${klineData[0]?.time} ~ ${klineData[klineData.length-1]?.time}`);
+          } catch(innerErr) {
+            console.error('[renderChart] 动画帧内渲染失败', innerErr);
+          }
+        });
+      } catch(e) {
+        console.error('[renderChart] 渲染失败', e);
+      }
+    }
+
+    // 提取指标渲染为独立方法
+    function renderIndicators() {
+      if (typeof Indicators === 'undefined') {
+        console.warn('[renderIndicators] Indicators 模块未加载，跳过指标渲染');
+        if (chart) chart.timeScale().fitContent();
+        return;
       }
 
-      // 设置K线数据
-      candleSeries.setData(klineData.map(d => ({
-        time:d.time, 
-        open:d.open, 
-        high:d.high, 
-        low:d.low, 
-        close:d.close
-      })));
-
-      // 设置成交量数据
-      volumeSeries.setData(klineData.map(d => ({
-        time: d.time,
-        value: d.volume,
-        color: d.close >= d.open ? 'rgba(248,81,73,0.3)' : 'rgba(63,185,80,0.3)'
-      })));
-
-      // 计算指标数据
-      const closes = klineData.map(d => d.close);
-      const highs  = klineData.map(d => d.high);
-      const lows   = klineData.map(d => d.low);
-
-      // MA
-      renderMA(closes);
-      
-      // MACD
-      if (indicators.value.find(i=>i.key==='macd'&&i.on)) {
-        renderMACD(closes);
+      try {
+        const closes = klineData.map(d => d.close);
+        renderMA(closes);
+        if (indicators.value.find(i=>i.key==='macd'&&i.on)) renderMACD(closes);
+        if (indicators.value.find(i=>i.key==='rsi'&&i.on))  renderRSI(closes);
+        if (indicators.value.find(i=>i.key==='boll'&&i.on)) renderBOLL(closes);
+      } catch(e) {
+        console.error('[renderIndicators] 指标渲染失败', e);
       }
-      
-      // RSI
-      if (indicators.value.find(i=>i.key==='rsi'&&i.on)) {
-        renderRSI(closes);
-      }
-      
-      // BOLL
-      if (indicators.value.find(i=>i.key==='boll'&&i.on)) {
-        renderBOLL(closes);
-      }
-
-      chart.timeScale().fitContent();
     }
 
     function renderMA(closes) {
@@ -548,67 +581,166 @@ createApp({
       createFundPanelSeries();
     }
 
-    // =========== 获取K线数据 ===========
-    async function fetchKline(code, datalen = 200) {
-      // 第1步：优先加载本地预生成的JSON文件（无CORS问题）
+    // =========== 获取K线数据（优化版）===========
+    // 带超时的fetch，防止请求卡死
+    async function fetchWithTimeout(url, timeoutMs = 5000) {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const resp = await fetch(url, { signal: controller.signal, credentials: 'omit' });
+        return resp;
+      } finally {
+        clearTimeout(tid);
+      }
+    }
+
+    // file:// 协议下用 XMLHttpRequest 加载本地 JSON（绕过 CORS）
+    function loadLocalFileXHR(url) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.overrideMimeType('application/json');
+        xhr.open('GET', url, true);
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 0 || xhr.status === 200) {
+              try { resolve(JSON.parse(xhr.responseText)); }
+              catch(e) { reject(new Error('JSON解析失败')); }
+            } else {
+              reject(new Error('HTTP ' + xhr.status));
+            }
+          }
+        };
+        xhr.onerror = () => reject(new Error('XHR请求失败'));
+        xhr.send();
+      });
+    }
+
+    async function fetchKline(code, datalen = 800) {
+      // 第0步：优先使用内嵌数据（file:// 协议下唯一可靠方案）
+      if (typeof window.EMBEDDED_KLINE_DATA !== 'undefined' && window.EMBEDDED_KLINE_DATA[code]) {
+        const kline = window.EMBEDDED_KLINE_DATA[code];
+        if (Array.isArray(kline) && kline.length > 50) {
+          console.log(`[fetchKline] 使用内嵌数据: ${code}, ${kline.length}条`);
+          return kline;
+        }
+      }
+
+      // 第1步：file:// 协议下用 XHR 加载本地 JSON（绕过 fetch CORS 限制）
+      if (window.location.protocol === 'file:') {
+        try {
+          const kline = await loadLocalFileXHR(`data/kline/${code}.json`);
+          if (Array.isArray(kline) && kline.length > 50) {
+            console.log(`[fetchKline] 本地文件加载成功(file协议XHR): ${kline.length}条`);
+            return kline;
+          }
+        } catch(e) {
+          console.warn('[fetchKline] file协议XHR加载失败', e.message);
+        }
+        console.warn('[fetchKline] file协议下无本地数据，使用模拟数据');
+        return generateKline(datalen);
+      }
+
+      // 第2步：http/https 协议下正常 fetch 本地 JSON
       try {
         const localUrl = `data/kline/${code}.json`;
-        const resp = await fetch(localUrl);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const kline = await resp.json();
-        if (!Array.isArray(kline) || kline.length === 0) throw new Error('本地K线数据为空');
-        console.log(`[fetchKline] 本地文件加载成功: ${kline.length}条`);
-        return kline;
+        const resp = await fetchWithTimeout(localUrl, 3000);
+        if (resp.ok) {
+          const kline = await resp.json();
+          if (Array.isArray(kline) && kline.length > 50) {
+            console.log(`[fetchKline] 本地文件加载成功: ${kline.length}条`);
+            return kline;
+          }
+        }
       } catch(e) {
-        console.warn('[fetchKline] 本地文件不存在，尝试API请求', e.message);
+        console.warn('[fetchKline] 本地文件加载失败', e.message);
       }
 
-      // 第2步：尝试新浪API（可能CORS失败）
-      try {
-        const periodMap = { daily:'240', weekly:'1440', monthly:'10080' };
-        const scale = periodMap[period.value] || '240';
-        const targetUrl = `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${code}&scale=${scale}&ma=no&datalen=${datalen}`;
-        
-        const resp = await fetch(targetUrl);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const raw = await resp.json();
-        if (!Array.isArray(raw) || raw.length === 0) throw new Error('K线数据为空');
-        console.log(`[fetchKline] API请求成功: ${raw.length}条`);
-        return raw.map(item => ({
-          time:   item.day,
-          open:   parseFloat(item.open),
-          high:   parseFloat(item.high),
-          low:    parseFloat(item.low),
-          close:  parseFloat(item.close),
-          volume: parseInt(item.volume) || 0,
-        }));
-      } catch(e) {
-        console.warn('[fetchKline] API请求失败，尝试CORS代理', e.message);
+      // 第3步：并行发起多个API请求（不同源，看谁先成功）
+      // 新浪API - 大datalen获取更多历史数据
+      const sinaPromises = [];
+      const periodMap = { daily:'240', weekly:'1440', monthly:'10080' };
+      const scale = periodMap[period.value] || '240';
+
+      // 主请求 + 备选多页获取更早数据
+      const apiUrls = [
+        `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${code}&scale=${scale}&ma=no&datalen=${datalen}`,
+      ];
+
+      // 添加CORS代理版
+      const proxies = [
+        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      ];
+
+      // 尝试所有API源
+      for (const apiUrl of apiUrls) {
+        // 直连
+        sinaPromises.push(
+          (async () => {
+            try {
+              const resp = await fetchWithTimeout(apiUrl, 4000);
+              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+              const raw = await resp.json();
+              if (!Array.isArray(raw) || raw.length === 0) throw new Error('空数据');
+              return { source: '直连', data: raw };
+            } catch(e) {
+              throw e;
+            }
+          })()
+        );
+        // 代理
+        for (const proxyFn of proxies) {
+          sinaPromises.push(
+            (async () => {
+              try {
+                const proxyUrl = proxyFn(apiUrl);
+                const resp = await fetchWithTimeout(proxyUrl, 6000);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const raw = await resp.json();
+                if (!Array.isArray(raw) || raw.length === 0) throw new Error('空数据');
+                return { source: '代理', data: raw };
+              } catch(e) {
+                throw e;
+              }
+            })()
+          );
+        }
       }
 
-      // 第3步：CORS代理
-      try {
-        const periodMap = { daily:'240', weekly:'1440', monthly:'10080' };
-        const scale = periodMap[period.value] || '240';
-        const targetUrl = `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${code}&scale=${scale}&ma=no&datalen=${datalen}`;
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-        const resp = await fetch(proxyUrl);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const raw = await resp.json();
-        if (!Array.isArray(raw) || raw.length === 0) throw new Error('K线数据为空');
-        console.log(`[fetchKline] 代理请求成功: ${raw.length}条`);
-        return raw.map(item => ({
-          time:   item.day,
-          open:   parseFloat(item.open),
-          high:   parseFloat(item.high),
-          low:    parseFloat(item.low),
-          close:  parseFloat(item.close),
-          volume: parseInt(item.volume) || 0,
-        }));
-      } catch(e) {
-        console.error('[fetchKline] 所有方法都失败', e.message);
-        throw new Error('K线数据获取失败');
+      // 等待第一个成功的响应
+      let firstError = null;
+      while (sinaPromises.length > 0) {
+        const settled = await Promise.anySettled ?
+          Promise.anySettled(sinaPromises.map((p, i) => p.then(r => ({idx: i, result: r})).catch(e => { throw e; }))) :
+          null;
+
+        // 使用 Promise.any 获取第一个成功
+        try {
+          const result = await Promise.any(sinaPromises);
+          const raw = result.data;
+          console.log(`[fetchKline] ${result.source}请求成功: ${raw.length}条`);
+          const mapped = raw.map(item => ({
+            time:   item.day,
+            open:   parseFloat(item.open),
+            high:   parseFloat(item.high),
+            low:    parseFloat(item.low),
+            close:  parseFloat(item.close),
+            volume: parseInt(item.volume) || 0,
+          }));
+
+          // 检查数据量是否足够覆盖历史
+          if (mapped.length < 200) {
+            console.warn(`[fetchKline] 数据量较少(${mapped.length}条)，尝试获取更多`);
+          }
+          return mapped;
+        } catch(e) {
+          firstError = e;
+          break; // 所有请求都失败
+        }
       }
+
+      console.warn('[fetchKline] 所有API方式均失败，使用增强模拟数据', firstError?.message);
+      return generateKline(800);
     }
 
     // =========== 获取实时行情 ===========
@@ -681,41 +813,76 @@ createApp({
       const code = stockCode.value.trim();
       if (!code) return;
 
+      // 显示加载状态
+      chartLoading.value = true;
+      chartLoadingMsg.value = '正在加载股票数据...';
+      chartLoadFailed.value = false;
+
       try {
-        // 1. 获取K线数据
-        klineData = await fetchKline(code, 300);
+        // 1. 获取K线数据（更新进度消息）
+        chartLoadingMsg.value = '正在请求K线数据...';
+        klineData = await fetchKline(code, 800);
         console.log(`[loadStock] K线数据加载成功: ${klineData.length}条`);
+
+        chartLoadingMsg.value = '正在获取实时行情...';
 
         // 2. 获取实时行情
         const q = await fetchQuoteText(code);
         if (q) {
           quote.value = q;
         } else {
-          // 所有接口都失败，使用K线最后一天作为行情
           quote.value = makeFallbackQuote(klineData, code);
-          quoteSource.value = '回退';  // 标记为回退数据
+          quoteSource.value = '回退';
         }
 
-        // 切换股票时清除基本面副图
+        // 3. 切换股票时清除基本面副图
         fundHistory.value = null;
         removeFundSeries();
+
+        // 4. 渲染图表（使用 requestAnimationFrame 确保UI先更新）
+        chartLoadingMsg.value = '正在渲染图表...';
+        await new Promise(resolve => requestAnimationFrame(resolve));
         renderChart();
+
+        // 5. 隐藏加载状态
+        chartLoading.value = false;
+        chartLoadingMsg.value = '';
       } catch(e) {
         console.error('加载股票数据失败', e);
-        // 使用模拟数据
+        chartLoadFailed.value = true;
+        chartLoadingMsg.value = '网络请求失败，使用模拟数据...';
+
+        // 使用增强模拟数据兜底
         const found = stockList.value.find(s => s.code === code);
-        klineData = generateKline(200);
+        klineData = generateKline(800);
         quote.value = {
           name: found ? found.name : code + '(模拟)',
-          price: '10.50',
-          change: '0.25',
-          pct: '2.44',
+          price: klineData[klineData.length - 1]?.close?.toFixed(2) || '150.00',
+          change: '0.00',
+          pct: '0.00',
           vol: 12500000,
           amt: 131250000,
           time: new Date().toLocaleTimeString(),
         };
-        renderChart();
+        try {
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          renderChart();
+        } catch(e2) { console.error('renderChart 失败', e2); }
+
+        // 延迟自动关闭loading显示模拟数据
+        setTimeout(() => {
+          chartLoading.value = false;
+          chartLoadingMsg.value = '';
+        }, 1500);
       }
+    }
+
+    function retryLoadStock() {
+      chartLoadFailed.value = false;
+      chartLoading.value = true;
+      chartLoadingMsg.value = '正在重试...';
+      // 直接重新加载（不等待loading显示）
+      loadStock();
     }
 
     // =========== 回测 ===========
@@ -1193,6 +1360,8 @@ createApp({
         { key:'roe', label:'ROE',      value:'12.5%', percentile:58.3 },
         { key:'dy',  label:'股息率',   value:'3.2%',  percentile:68.7 },
       ];
+      // 通知HTML：Vue已挂载
+      window.dispatchEvent(new Event('vue-mounted'));
     });
 
     return {
@@ -1204,7 +1373,8 @@ createApp({
       searchQuery, searchResults, onSearchInput, selectStock,
       updateTimer, startRealtime, stopRealtime,
       showLog, toggleLog,
-      loadStock, toggleIndicator, toggleLogScale, toggleFundPanel, runBacktest, showFundamental,
+      chartLoading, chartLoadingMsg, chartLoadFailed,
+      loadStock, retryLoadStock, toggleIndicator, toggleLogScale, toggleFundPanel, runBacktest, showFundamental,
       fmtVol, fmtAmt,
     };
   }
