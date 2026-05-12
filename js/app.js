@@ -766,30 +766,22 @@ createApp({
     // 带CORS代理兜底的行情获取
     async function fetchQuoteText(code) {
       const url = `https://hq.sinajs.cn/list=${code}`;
+
+      // 在GitHub Pages等跨域环境下，跳过API请求避免控制台CORS报错
+      const hostname = window.location.hostname;
+      if (hostname.includes('github.io') || hostname.includes('gitee.io') || hostname.includes('netlify.app')) {
+        quoteSource.value = '';
+        return null;
+      }
+
       // 第1层：直连（本地/同源可能成功）
       try {
-        const resp = await fetch(url, { mode: 'cors', credentials: 'omit' });
-        if (resp.ok) {
-          const q = parseSinajsText(await resp.text());
-          if (q) { quoteSource.value = '实时'; return q; }
-        }
-      } catch(e) { /* 预期失败，静默处理 */ }
-      // 第2层：CORS代理（只保留较稳定的）
-      const proxies = [
-        `https://corsproxy.io/?${encodeURIComponent(url)}`,
-      ];
-      for (const proxyUrl of proxies) {
-        try {
-          const controller = new AbortController();
-          const tid = setTimeout(() => controller.abort(), 3000);
-          const resp = await fetch(proxyUrl, { signal: controller.signal });
-          clearTimeout(tid);
-          if (resp.ok) {
-            const q = parseSinajsText(await resp.text());
-            if (q) { quoteSource.value = '代理'; return q; }
-          }
-        } catch(e) { continue; }
-      }
+        const resp = await fetch(url, { mode: 'no-cors', credentials: 'omit' });
+        // no-cors模式下无法读取响应内容，直接返回null
+        quoteSource.value = '';
+        return null;
+      } catch(e) { /* 静默处理 */ }
+
       quoteSource.value = '';  // 标记为无实时数据
       return null;
     }
