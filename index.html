@@ -16,84 +16,209 @@
 
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
+  
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --border-color: #30363d;
+    --text-primary: #c9d1d9;
+    --text-secondary: #8b949e;
+    --accent-blue: #58a6ff;
+    --accent-green: #3fb950;
+    --accent-red: #f85149;
+    --accent-orange: #d29922;
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--bg-primary);
     min-height: 100vh;
-    padding: 10px;
-    color: #333;
+    color: var(--text-primary);
+    overflow-x: hidden;
   }
-  /* ========== 头部 ========== */
-  .header {
-    background: rgba(255,255,255,0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
-    padding: 16px 20px;
+
+  /* ========== 左侧导航栏 ========== */
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 60px;
+    height: 100vh;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    z-index: 1000;
+    transition: width 0.3s ease;
+  }
+
+  .sidebar-item {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: 10px;
+    gap: 2px;
+  }
+
+  .sidebar-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .sidebar-item.active {
+    background: rgba(88, 166, 255, 0.15);
+    color: var(--accent-blue);
+  }
+
+  .sidebar-item .icon {
+    font-size: 20px;
+  }
+
+  /* ========== 主内容区 ========== */
+  .main-content {
+    margin-left: 60px;
+    padding: 12px;
+    transition: margin-left 0.3s ease;
+  }
+
+  /* ========== 顶部状态栏 ========== */
+  .top-bar {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px 16px;
     margin-bottom: 12px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
   }
-  .header h1 {
-    font-size: 20px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+
+  .top-bar h1 {
+    font-size: 18px;
     font-weight: 700;
+    color: var(--text-primary);
   }
-  .header-status { font-size: 13px; color: #888; }
+
+  .stock-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .stock-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stock-info-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .stock-info-value {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
 
   /* ========== 股票搜索 ========== */
   .stock-search {
     position: relative;
     width: 220px;
   }
+
   .stock-search input {
     width: 100%;
     padding: 8px 12px;
-    border: 2px solid #e0e0e0;
+    border: 1px solid var(--border-color);
     border-radius: 10px;
     font-size: 14px;
     outline: none;
     transition: border-color 0.3s;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
   }
-  .stock-search input:focus { border-color: #667eea; }
+
+  .stock-search input:focus {
+    border-color: var(--accent-blue);
+  }
+
+  .stock-search input::placeholder {
+    color: var(--text-secondary);
+  }
+
   .search-results {
     position: absolute;
     top: 100%;
     left: 0; right: 0;
-    background: #fff;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
     border-radius: 10px;
     margin-top: 4px;
     max-height: 200px;
     overflow-y: auto;
     z-index: 100;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     display: none;
   }
+
   .search-results.show { display: block; }
+
   .search-item {
     padding: 8px 12px;
     cursor: pointer;
     font-size: 13px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
   }
-  .search-item:hover { background: #f0f4ff; }
-  .search-item .code { font-weight: 600; color: #667eea; }
-  .search-item .name { color: #333; margin-left: 6px; }
+
+  .search-item:hover { background: var(--bg-tertiary); }
+
+  .search-item .code { font-weight: 600; color: var(--accent-blue); }
+  .search-item .name { color: var(--text-primary); margin-left: 6px; }
 
   /* ========== 卡片 ========== */
   .card {
-    background: rgba(255,255,255,0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     padding: 16px;
     margin-bottom: 12px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
   }
 
   /* ========== 标签栏 ========== */
@@ -101,26 +226,28 @@
     display: flex;
     gap: 6px;
     margin-bottom: 16px;
-    background: #f0f0f0;
+    background: var(--bg-tertiary);
     padding: 4px;
-    border-radius: 12px;
+    border-radius: 10px;
   }
+
   .tab-bar button {
     flex: 1;
     padding: 8px 12px;
     border: none;
-    border-radius: 10px;
+    border-radius: 8px;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
     background: transparent;
-    color: #666;
+    color: var(--text-secondary);
   }
+
   .tab-bar button.active {
-    background: #fff;
-    color: #667eea;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: var(--bg-secondary);
+    color: var(--accent-blue);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   }
 
   /* ========== 按钮 ========== */
@@ -133,47 +260,56 @@
     cursor: pointer;
     transition: all 0.3s;
   }
+
   .btn-primary {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: var(--accent-blue);
     color: #fff;
   }
-  .btn-success { background: #22c55e; color: #fff; }
-  .btn-warning { background: #f59e0b; color: #fff; }
-  .btn-default { background: #f0f0f0; color: #666; }
+
+  .btn-primary:hover {
+    background: #4a9aef;
+  }
+
+  .btn-success { background: var(--accent-green); color: #fff; }
+  .btn-warning { background: var(--accent-orange); color: #fff; }
+  .btn-default { background: var(--bg-tertiary); color: var(--text-secondary); }
 
   /* ========== K线图容器 ========== */
   #kline-chart {
     width: 100%;
     height: 450px;
   }
+
   @media (max-width: 768px) {
     #kline-chart { height: 320px; }
     .stock-search { width: 160px; }
-    .header h1 { font-size: 16px; }
+    .top-bar h1 { font-size: 16px; }
   }
 
-  /* ========== 指标按钮 ========== */
+  /* ========== 指标按钮 (pill形状) ========== */
   .indicator-bar {
     display: flex;
     gap: 6px;
     margin-top: 10px;
     flex-wrap: wrap;
   }
+
   .indicator-btn {
-    padding: 5px 10px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    background: #fff;
+    padding: 5px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    background: var(--bg-tertiary);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
-    color: #666;
+    color: var(--text-secondary);
   }
+
   .indicator-btn.active {
-    border-color: #667eea;
-    color: #667eea;
-    background: #f0f4ff;
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    background: rgba(88, 166, 255, 0.1);
   }
 
   /* ========== 行情显示 ========== */
@@ -183,27 +319,190 @@
     gap: 8px;
     margin-top: 10px;
   }
+
   .quote-item {
-    background: #f9f9f9;
+    background: var(--bg-tertiary);
     padding: 8px 10px;
     border-radius: 8px;
+    border: 1px solid var(--border-color);
   }
-  .quote-label { font-size: 11px; color: #888; }
-  .quote-value { font-size: 16px; font-weight: 700; }
+
+  .quote-label { font-size: 11px; color: var(--text-secondary); }
+  .quote-value { font-size: 16px; font-weight: 700; color: var(--text-primary); }
 
   /* ========== 回测结果 ========== */
   .backtest-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
+
   .backtest-item {
-    background: #fff;
+    background: var(--bg-tertiary);
     padding: 10px 12px;
     border-radius: 8px;
+    border: 1px solid var(--border-color);
   }
-  .backtest-label { font-size: 12px; color: #888; }
-  .backtest-value { font-size: 16px; font-weight: 700; }
+
+  .backtest-label { font-size: 12px; color: var(--text-secondary); }
+  .backtest-value { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+
+  /* ========== 三栏布局 ========== */
+  .backtest-layout {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .backtest-left {
+    width: 25%;
+    min-width: 200px;
+  }
+
+  .backtest-center {
+    width: 35%;
+    min-width: 250px;
+  }
+
+  .backtest-right {
+    width: 40%;
+    min-width: 300px;
+  }
+
+  @media (max-width: 1024px) {
+    .backtest-layout {
+      flex-direction: column;
+    }
+    .backtest-left, .backtest-center, .backtest-right {
+      width: 100%;
+      min-width: auto;
+    }
+  }
+
+  /* ========== 参数面板 ========== */
+  .param-panel {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .param-group {
+    margin-bottom: 12px;
+  }
+
+  .param-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .param-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    outline: none;
+  }
+
+  .param-input:focus {
+    border-color: var(--accent-blue);
+  }
+
+  .param-select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    outline: none;
+    cursor: pointer;
+  }
+
+  /* ========== 高级选项 ========== */
+  .advanced-toggle {
+    font-size: 12px;
+    color: var(--accent-blue);
+    cursor: pointer;
+    margin-top: 8px;
+    display: inline-block;
+  }
+
+  .advanced-options {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  /* ========== 结果仪表板 ========== */
+  .result-dashboard {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  /* ========== 资金曲线图 ========== */
+  #equity-chart {
+    margin-top: 12px;
+    height: 250px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+  }
+
+  /* ========== 交易记录表格 ========== */
+  .trade-table {
+    margin-top: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-secondary);
+  }
+
+  .trade-table-header {
+    display: grid;
+    grid-template-columns: 1fr 80px 100px 80px 100px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .trade-table-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 100px 80px 100px;
+    padding: 6px 12px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .trade-table-row:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .trade-type-buy {
+    color: var(--accent-green);
+    font-weight: 600;
+  }
+
+  .trade-type-sell {
+    color: var(--accent-red);
+    font-weight: 600;
+  }
 
   /* ========== 日志 ========== */
   .log-panel {
@@ -218,183 +517,378 @@
     margin-top: 10px;
     white-space: pre-wrap;
     display: none;
+    border: 1px solid var(--border-color);
   }
+
   .log-panel.show { display: block; }
+
+  /* ========== 响应式设计 ========== */
+  @media (max-width: 768px) {
+    .sidebar {
+      width: 0;
+      overflow: hidden;
+    }
+
+    .main-content {
+      margin-left: 0;
+    }
+
+    .mobile-nav {
+      display: flex;
+    }
+  }
+
+  @media (min-width: 769px) {
+    .mobile-nav {
+      display: none;
+    }
+  }
+
+  /* ========== 移动端底部导航 ========== */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 0;
+    z-index: 1000;
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: var(--text-secondary);
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  .mobile-nav-item.active {
+    color: var(--accent-blue);
+  }
+
+  .mobile-nav-item .icon {
+    font-size: 20px;
+  }
+
+  /* ========== 滚动条样式 ========== */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-color);
+  }
+
+  /* ========== 副图面板标题 ========== */
+  .subchart-label {
+    position: absolute;
+    left: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    pointer-events: none;
+    background: rgba(13, 17, 23, 0.8);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--text-secondary);
+  }
 </style>
 </head>
 <body>
 
 <div id="app">
-  <!-- 头部工具栏 -->
-  <div class="header">
-    <div>
-      <h1>📈 量化回测系统 Pro</h1>
-      <div class="header-status" id="header-status">Pure Frontend · Free Hosting · WeChat Ready</div>
+  <!-- 左侧导航栏 -->
+  <div class="sidebar">
+    <div class="sidebar-item" :class="{active: activeMainTab==='chart'}" @click="activeMainTab='chart'">
+      <span class="icon">📊</span>
+      <span>K线图</span>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <!-- 股票搜索 -->
-      <div class="stock-search">
-        <input type="text" v-model="searchQuery" @input="onSearchInput"
-               placeholder="搜索股票代码/名称..." autocomplete="off">
-        <div class="search-results" :class="{show: searchResults.length > 0 && searchQuery.length >= 2}">
-          <div class="search-item" v-for="item in searchResults" @click="selectStock(item)">
-            <span class="code">{{ item.code }}</span>
-            <span class="name">{{ item.name }}</span>
-          </div>
-        </div>
-      </div>
-      <button class="btn btn-primary" @click="loadStock">📊 加载数据</button>
-      <button class="btn btn-success" v-if="!updateTimer" @click="startRealtime">▶️ 实时</button>
-      <button class="btn btn-warning" v-else @click="stopRealtime">⏸️ 停止</button>
-      <button class="btn btn-default" @click="toggleLog">{{ showLog ? '隐藏日志' : '显示日志' }}</button>
+    <div class="sidebar-item" :class="{active: activeMainTab==='backtest'}" @click="activeMainTab='backtest'">
+      <span class="icon">🎯</span>
+      <span>回测</span>
+    </div>
+    <div class="sidebar-item" :class="{active: showFundPanel}" @click="toggleFundPanel">
+      <span class="icon">📊</span>
+      <span>基本面</span>
+    </div>
+    <div class="sidebar-item">
+      <span class="icon">⚙️</span>
+      <span>设置</span>
     </div>
   </div>
 
-  <!-- 行情显示 -->
-  <div class="card" v-if="quote" style="padding:12px 16px;margin-bottom:12px;">
-    <div class="quote-grid">
-      <div class="quote-item">
-        <div class="quote-label">股票</div>
-        <div class="quote-value" style="font-size:14px;">
-          {{ quote.name }} 
-          <span style="color:#888;font-size:12px;">{{ stockCode }}</span>
-          <span v-if="quoteSource" style="font-size:11px;background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;margin-left:6px;">
-            {{ quoteSource }}
-          </span>
-          <span v-else style="font-size:11px;background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:4px;margin-left:6px;">
-            离线
-          </span>
-        </div>
-      </div>
-      <div class="quote-item">
-        <div class="quote-label">最新价</div>
-        <div class="quote-value" :style="{color: quote.change>=0?'#ef5350':'#26a69a'}">{{ quote.price }}</div>
-      </div>
-      <div class="quote-item">
-        <div class="quote-label">涨跌幅</div>
-        <div class="quote-value" :style="{color: quote.change>=0?'#ef5350':'#26a69a'}">{{ quote.change>=0?'+':'' }}{{ quote.pct }}%</div>
-      </div>
-      <div class="quote-item">
-        <div class="quote-label">成交量</div>
-        <div class="quote-value">{{ fmtVol(quote.vol) }}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 主内容 -->
-  <div class="card">
-    <!-- 标签栏 -->
-    <div class="tab-bar">
-      <button :class="{active: activeMainTab==='chart'}" @click="activeMainTab='chart'">📊 K线图</button>
-      <button :class="{active: activeMainTab==='backtest'}" @click="activeMainTab='backtest'">🎯 回测</button>
-    </div>
-
-    <!-- K线图 -->
-    <div v-show="activeMainTab==='chart'">
-      <div style="position:relative;">
-        <div id="kline-chart"></div>
-        <!-- 副图面板标题 -->
-        <div style="position:absolute;left:8px;top:52%;font-size:11px;color:#888;pointer-events:none;font-weight:600;background:rgba(255,255,255,0.8);padding:1px 6px;border-radius:4px;" v-show="indicators.find(i=>i.key==='macd'&&i.on)">MACD</div>
-        <div style="position:absolute;left:8px;top:78%;font-size:11px;color:#888;pointer-events:none;font-weight:600;background:rgba(255,255,255,0.8);padding:1px 6px;border-radius:4px;" v-show="indicators.find(i=>i.key==='rsi'&&i.on)">RSI</div>
-        <div style="position:absolute;left:8px;top:72%;font-size:11px;color:#888;pointer-events:none;font-weight:600;background:rgba(255,255,255,0.8);padding:1px 6px;border-radius:4px;" v-show="showFundPanel">
-          📊 PE <span style="color:#2962FF;font-weight:700;">●</span> PB <span style="color:#FF6B6B;font-weight:700;">●</span> ROE <span style="color:#26A69A;font-weight:700;">●</span> 股息率 <span style="color:#FFA726;font-weight:700;">●</span>
-        </div>
-      </div>
-      <div class="indicator-bar">
-        <button v-for="ind in indicators" :key="ind.key"
-                class="indicator-btn" :class="{active: ind.on}"
-                @click="toggleIndicator(ind.key)">
-          {{ ind.label }}
-        </button>
-        <button class="indicator-btn" :class="{active: useLogScale}"
-                @click="toggleLogScale" style="margin-left:auto;">📐 对数</button>
-        <button class="indicator-btn" :class="{active: showFundPanel}"
-                @click="toggleFundPanel">📊 基本面 <span v-if="showFundPanel" style="color:#22c55e;font-size:10px;">●</span></button>
-      </div>
-    </div>
-
-    <!-- 回测面板 -->
-    <div v-show="activeMainTab==='backtest'">
-      <h3 style="margin-bottom:12px;font-size:16px;">🎯 策略回测</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px;">
-        <div>
-          <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">策略选择</label>
-          <select v-model="btStrategy" style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;background:#f8f9fa;">
-            <option value="dualMA">双均线策略</option>
-            <option value="macd">MACD策略</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">初始资金</label>
-          <input type="number" v-model.number="btCapital" style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;background:#f8f9fa;">
-        </div>
-        <div v-if="btStrategy==='dualMA'">
-          <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">短周期</label>
-          <input type="number" v-model.number="btParam.short" style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;background:#f8f9fa;">
-        </div>
-        <div v-if="btStrategy==='dualMA'">
-          <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">长周期</label>
-          <input type="number" v-model.number="btParam.long" style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;background:#f8f9fa;">
-        </div>
-      </div>
-      <button class="btn btn-primary" style="width:100%;" @click="runBacktest">🚀 运行回测</button>
-
-      <!-- 回测结果 -->
-      <div v-if="btResult" style="margin-top:20px;">
-        <div style="background:#f8f9f9;padding:16px;border-radius:12px;">
-          <h4 style="margin-bottom:12px;font-size:15px;">📊 回测结果</h4>
-          <div class="backtest-grid">
-            <div class="backtest-item">
-              <div class="backtest-label">总收益率</div>
-              <div class="backtest-value" :style="{color: btResult.totalReturn>=0?'#ef5350':'#26a69a'}">{{ btResult.totalReturn.toFixed(2) }}%</div>
-            </div>
-            <div class="backtest-item">
-              <div class="backtest-label">年化收益</div>
-              <div class="backtest-value">{{ btResult.annualReturn.toFixed(2) }}%</div>
-            </div>
-            <div class="backtest-item">
-              <div class="backtest-label">最大回撤</div>
-              <div class="backtest-value" style="color:#26a69a;">{{ btResult.maxDrawdown.toFixed(2) }}%</div>
-            </div>
-            <div class="backtest-item">
-              <div class="backtest-label">夏普比率</div>
-              <div class="backtest-value">{{ btResult.sharpe.toFixed(2) }}</div>
-            </div>
-            <div class="backtest-item">
-              <div class="backtest-label">交易次数</div>
-              <div class="backtest-value">{{ btResult.trades }}</div>
-            </div>
-            <div class="backtest-item">
-              <div class="backtest-label">胜率</div>
-              <div class="backtest-value">{{ btResult.winRate.toFixed(1) }}%</div>
-            </div>
+  <!-- 主内容区 -->
+  <div class="main-content" :style="{marginLeft: isMobile ? '0' : '60px'}">
+    <!-- 顶部状态栏 -->
+    <div class="top-bar">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h1>📈 量化回测系统 Pro</h1>
+        <div class="stock-info" v-if="quote">
+          <div class="stock-info-item">
+            <span class="stock-info-label">股票</span>
+            <span class="stock-info-value" style="font-size:14px;">
+              {{ quote.name }}
+              <span style="color:var(--text-secondary);font-size:12px;">{{ stockCode }}</span>
+              <span v-if="quoteSource" style="font-size:11px;background:rgba(63,185,80,0.15);color:var(--accent-green);padding:1px 6px;border-radius:4px;margin-left:6px;">
+                {{ quoteSource }}
+              </span>
+              <span v-else style="font-size:11px;background:rgba(210,153,34,0.15);color:var(--accent-orange);padding:1px 6px;border-radius:4px;margin-left:6px;">
+                离线
+              </span>
+            </span>
           </div>
-        </div>
-        <!-- 资金曲线图 -->
-        <div id="equity-chart" style="margin-top:16px;height:250px;"></div>
-        <!-- 交易记录 -->
-        <div v-if="btResult.tradeList && btResult.tradeList.length > 0" style="margin-top:16px;">
-          <h4 style="margin-bottom:8px;font-size:14px;">📋 交易记录</h4>
-          <div style="max-height:200px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:8px;">
-            <div v-for="(t, idx) in btResult.tradeList.slice(0, 20)" :key="idx"
-                 style="display:flex;justify-content:space-between;padding:6px 10px;font-size:12px;border-bottom:1px solid #f0f0f0;">
-              <span>{{ t.time }}</span>
-              <span :style="{color: t.type==='buy'?'#22c55e':'#ef5350'}">{{ t.type==='buy'?'买入':'卖出' }}</span>
-              <span>¥{{ t.price }}</span>
-              <span>{{ t.type==='buy' ? t.shares+'股' : t.profit }}</span>
-            </div>
+          <div class="stock-info-item">
+            <span class="stock-info-label">最新价</span>
+            <span class="stock-info-value" :style="{color: quote.change>=0?'var(--accent-red)':'var(--accent-green)'}">
+              {{ quote.price }}
+            </span>
+          </div>
+          <div class="stock-info-item">
+            <span class="stock-info-label">涨跌幅</span>
+            <span class="stock-info-value" :style="{color: quote.change>=0?'var(--accent-red)':'var(--accent-green)'}">
+              {{ quote.change>=0?'+':'' }}{{ quote.pct }}%
+            </span>
+          </div>
+          <div class="stock-info-item">
+            <span class="stock-info-label">成交量</span>
+            <span class="stock-info-value">
+              {{ fmtVol(quote.vol) }}
+            </span>
           </div>
         </div>
       </div>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <!-- 股票搜索 -->
+        <div class="stock-search">
+          <input type="text" v-model="searchQuery" @input="onSearchInput"
+                 placeholder="搜索股票代码/名称..." autocomplete="off">
+          <div class="search-results" :class="{show: searchResults.length > 0 && searchQuery.length >= 2}">
+            <div class="search-item" v-for="item in searchResults" @click="selectStock(item)">
+              <span class="code">{{ item.code }}</span>
+              <span class="name">{{ item.name }}</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary" @click="loadStock">📊 加载</button>
+        <button class="btn btn-success" v-if="!updateTimer" @click="startRealtime">▶️ 实时</button>
+        <button class="btn btn-warning" v-else @click="stopRealtime">⏸️ 停止</button>
+        <button class="btn btn-default" @click="toggleLog">{{ showLog ? '隐藏日志' : '日志' }}</button>
+        <div class="status-indicator" v-if="updateTimer">
+          <div class="status-dot"></div>
+          <span>实时更新中</span>
+        </div>
+      </div>
     </div>
 
+    <!-- 行情显示 -->
+    <div class="card" v-if="quote" style="padding:12px 16px;margin-bottom:12px;">
+      <div class="quote-grid">
+        <div class="quote-item">
+          <div class="quote-label">股票</div>
+          <div class="quote-value" style="font-size:14px;">
+            {{ quote.name }}
+            <span style="color:var(--text-secondary);font-size:12px;">{{ stockCode }}</span>
+          </div>
+        </div>
+        <div class="quote-item">
+          <div class="quote-label">最新价</div>
+          <div class="quote-value" :style="{color: quote.change>=0?'var(--accent-red)':'var(--accent-green)'}">{{ quote.price }}</div>
+        </div>
+        <div class="quote-item">
+          <div class="quote-label">涨跌幅</div>
+          <div class="quote-value" :style="{color: quote.change>=0?'var(--accent-red)':'var(--accent-green)'}">{{ quote.change>=0?'+':'' }}{{ quote.pct }}%</div>
+        </div>
+        <div class="quote-item">
+          <div class="quote-label">成交量</div>
+          <div class="quote-value">{{ fmtVol(quote.vol) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="card">
+      <!-- K线图 -->
+      <div v-show="activeMainTab==='chart'">
+        <div style="position:relative;">
+          <div id="kline-chart"></div>
+          <!-- 副图面板标题 -->
+          <div class="subchart-label" style="top:52%;" v-show="indicators.find(i=>i.key==='macd'&&i.on)">MACD</div>
+          <div class="subchart-label" style="top:78%;" v-show="indicators.find(i=>i.key==='rsi'&&i.on)">RSI</div>
+          <div class="subchart-label" style="top:72%;" v-show="showFundPanel">
+            📊 PE <span style="color:#2962FF;font-weight:700;">●</span> PB <span style="color:#FF6B6B;font-weight:700;">●</span> ROE <span style="color:#26A69A;font-weight:700;">●</span> 股息率 <span style="color:#FFA726;font-weight:700;">●</span>
+          </div>
+        </div>
+        <div class="indicator-bar">
+          <button v-for="ind in indicators" :key="ind.key"
+                  class="indicator-btn" :class="{active: ind.on}"
+                  @click="toggleIndicator(ind.key)">
+            {{ ind.label }}
+          </button>
+          <button class="indicator-btn" :class="{active: useLogScale}"
+                  @click="toggleLogScale" style="margin-left:auto;">📐 对数</button>
+          <button class="indicator-btn" :class="{active: showFundPanel}"
+                  @click="toggleFundPanel">📊 基本面 <span v-if="showFundPanel" style="color:var(--accent-green);font-size:10px;">●</span></button>
+        </div>
+      </div>
+
+      <!-- 回测面板 (三栏布局) -->
+      <div v-show="activeMainTab==='backtest'">
+        <h3 style="margin-bottom:12px;font-size:16px;color:var(--text-primary);">🎯 策略回测</h3>
+
+        <div class="backtest-layout">
+          <!-- 左栏：策略参数面板 -->
+          <div class="backtest-left">
+            <div class="param-panel">
+              <div class="param-group">
+                <label class="param-label">策略选择</label>
+                <select v-model="btStrategy" class="param-select">
+                  <option value="dualMA">双均线策略</option>
+                  <option value="macd">MACD策略</option>
+                </select>
+              </div>
+
+              <div class="param-group">
+                <label class="param-label">初始资金</label>
+                <input type="number" v-model.number="btCapital" class="param-input">
+              </div>
+
+              <div class="param-group" v-if="btStrategy==='dualMA'">
+                <label class="param-label">短周期</label>
+                <input type="number" v-model.number="btParam.short" class="param-input">
+              </div>
+
+              <div class="param-group" v-if="btStrategy==='dualMA'">
+                <label class="param-label">长周期</label>
+                <input type="number" v-model.number="btParam.long" class="param-input">
+              </div>
+
+              <!-- 高级选项 -->
+              <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
+                {{ showAdvanced ? '▼' : '▶' }} 高级选项
+              </div>
+              <div class="advanced-options" v-show="showAdvanced">
+                <div class="param-group">
+                  <label class="param-label">手续费率</label>
+                  <input type="number" v-model.number="btCommission" step="0.0001" class="param-input" style="margin-bottom:8px;">
+                </div>
+                <div class="param-group">
+                  <label class="param-label">滑点</label>
+                  <input type="number" v-model.number="btSlippage" step="0.0001" class="param-input">
+                </div>
+              </div>
+
+              <button class="btn btn-primary" style="width:100%;margin-top:12px;" @click="runBacktest">🚀 运行回测</button>
+            </div>
+          </div>
+
+          <!-- 中栏：回测结果仪表板 -->
+          <div class="backtest-center" v-if="btResult">
+            <div class="result-dashboard">
+              <h4 style="margin-bottom:12px;font-size:15px;color:var(--text-primary);">📊 回测结果</h4>
+              <div class="backtest-grid">
+                <div class="backtest-item">
+                  <div class="backtest-label">总收益率</div>
+                  <div class="backtest-value" :style="{color: btResult.totalReturn>=0?'var(--accent-red)':'var(--accent-green)'}">
+                    {{ btResult.totalReturn.toFixed(2) }}%
+                  </div>
+                </div>
+                <div class="backtest-item">
+                  <div class="backtest-label">年化收益</div>
+                  <div class="backtest-value">{{ btResult.annualReturn.toFixed(2) }}%</div>
+                </div>
+                <div class="backtest-item">
+                  <div class="backtest-label">最大回撤</div>
+                  <div class="backtest-value" style="color:var(--accent-green);">
+                    {{ btResult.maxDrawdown.toFixed(2) }}%
+                  </div>
+                </div>
+                <div class="backtest-item">
+                  <div class="backtest-label">夏普比率</div>
+                  <div class="backtest-value">{{ btResult.sharpe.toFixed(2) }}</div>
+                </div>
+                <div class="backtest-item">
+                  <div class="backtest-label">交易次数</div>
+                  <div class="backtest-value">{{ btResult.trades }}</div>
+                </div>
+                <div class="backtest-item">
+                  <div class="backtest-label">胜率</div>
+                  <div class="backtest-value">{{ btResult.winRate.toFixed(1) }}%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右栏：资金曲线图 -->
+          <div class="backtest-right" v-if="btResult">
+            <div style="background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:10px;padding:12px;">
+              <h4 style="margin-bottom:8px;font-size:14px;color:var(--text-primary);">📈 资金曲线</h4>
+              <div id="equity-chart" style="height:250px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 交易记录表格 -->
+        <div v-if="btResult && btResult.tradeList && btResult.tradeList.length > 0" class="trade-table">
+          <div class="trade-table-header">
+            <span>时间</span>
+            <span>类型</span>
+            <span>价格</span>
+            <span>数量</span>
+            <span>盈亏</span>
+          </div>
+          <div v-for="(t, idx) in btResult.tradeList.slice(0, 50)" :key="idx"
+               class="trade-table-row">
+            <span>{{ t.time }}</span>
+            <span :class="t.type==='buy'?'trade-type-buy':'trade-type-sell'">
+              {{ t.type==='buy'?'买入':'卖出' }}
+            </span>
+            <span>¥{{ t.price }}</span>
+            <span>{{ t.type==='buy' ? t.shares+'股' : '' }}</span>
+            <span :style="{color: t.profit>=0?'var(--accent-red)':'var(--accent-green)'}">
+              {{ t.type==='sell' ? (t.profit>=0?'+':'')+t.profit.toFixed(2) : '' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 日志面板 -->
+    <div class="card" v-if="showLog">
+      <h3 style="margin-bottom:8px;font-size:14px;color:var(--text-primary);">📋 调试日志</h3>
+      <div class="log-panel show" id="log-panel"></div>
     </div>
   </div>
 
-  <!-- 日志面板 -->
-  <div class="card" v-if="showLog">
-    <h3 style="margin-bottom:8px;font-size:14px;">📋 调试日志</h3>
-    <div class="log-panel show" id="log-panel"></div>
+  <!-- 移动端底部导航 -->
+  <div class="mobile-nav" v-if="isMobile">
+    <div class="mobile-nav-item" :class="{active: activeMainTab==='chart'}" @click="activeMainTab='chart'">
+      <span class="icon">📊</span>
+      <span>K线</span>
+    </div>
+    <div class="mobile-nav-item" :class="{active: activeMainTab==='backtest'}" @click="activeMainTab='backtest'">
+      <span class="icon">🎯</span>
+      <span>回测</span>
+    </div>
+    <div class="mobile-nav-item" :class="{active: showFundPanel}" @click="toggleFundPanel">
+      <span class="icon">📊</span>
+      <span>基本面</span>
+    </div>
   </div>
 </div>
 

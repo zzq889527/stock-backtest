@@ -17,6 +17,17 @@ createApp({
     const quote = ref(null);
     const period = ref('daily');
     const chartHeight = ref(450);
+    const isMobile = ref(window.innerWidth < 769);
+    const showAdvanced = ref(false);
+    const btCommission = ref(0.0003);
+    const btSlippage = ref(0.001);
+
+    // 监听窗口大小变化
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', () => {
+        isMobile.value = window.innerWidth < 769;
+      });
+    }
 
     // 指标开关
     const indicators = ref([
@@ -139,7 +150,7 @@ createApp({
 
     let klineData = [];
 
-    // =========== 初始化图表 ===========
+    // =========== 初始化图表（深色主题）===========
     function initChart() {
       const el = document.getElementById('kline-chart');
       if (!el) { console.error('[initChart] 找不到 kline-chart 元素'); return; }
@@ -147,25 +158,34 @@ createApp({
       try { if (chart) { chart.remove(); } } catch(e){}
       
       try {
-        const isMobile = window.innerWidth < 768;
-        chartHeight.value = isMobile ? 350 : 450;
+        const isMobileDevice = window.innerWidth < 768;
+        chartHeight.value = isMobileDevice ? 350 : 450;
         
         chart = LightweightCharts.createChart(el, {
           width: el.clientWidth, 
           height: chartHeight.value,
           layout: { 
-            background: { type:'solid', color:'#ffffff' }, 
-            textColor: '#333',
+            background: { type:'solid', color:'#0d1117' }, 
+            textColor: '#c9d1d9',
             fontSize: 11 
           },
           grid: { 
-            vertLines: { color:'#f0f0f0' }, 
-            horzLines: { color:'#f0f0f0' } 
+            vertLines: { color:'rgba(48,54,61,0.5)' }, 
+            horzLines: { color:'rgba(48,54,61,0.5)' } 
           },
-          crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-          rightPriceScale: { borderColor:'#e0e0e0', scaleMargins:{ top:0.0, bottom:0.50 } },
+          crosshair: { 
+            mode: LightweightCharts.CrosshairMode.Normal,
+            vertLine: { color:'rgba(88,166,255,0.5)', width:1, style:2 },
+            horzLine: { color:'rgba(88,166,255,0.5)', width:1, style:2 }
+          },
+          rightPriceScale: { 
+            borderColor:'#30363d', 
+            scaleMargins:{ top:0.0, bottom:0.50 },
+            textColor: '#c9d1d9'
+          },
           timeScale: { 
-            borderColor:'#e0e0e0', 
+            borderColor:'#30363d', 
+            textColor: '#c9d1d9',
             timeVisible: false, 
             secondsVisible: false,
             tickMarkFormatter: (time) => {
@@ -180,13 +200,12 @@ createApp({
         });
 
         // K线 - v5.0.6 API: addSeries(SeriesConstructor, options)
-        // LightweightCharts.CandlestickSeries
         candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
-          upColor:'#ef5350', 
-          downColor:'#26a69a',
+          upColor:'#f85149', 
+          downColor:'#3fb950',
           borderVisible:false,
-          wickUpColor:'#ef5350', 
-          wickDownColor:'#26a69a',
+          wickUpColor:'#f85149', 
+          wickDownColor:'#3fb950',
         });
 
         // 成交量 - Histogram
@@ -202,7 +221,7 @@ createApp({
           if (chart) chart.applyOptions({ width: el.clientWidth }); 
         });
         
-        console.log('[initChart] 图表初始化成功');
+        console.log('[initChart] 图表初始化成功（深色主题）');
       } catch(e) { 
         console.error('[initChart] 初始化失败', e); 
       }
@@ -229,7 +248,7 @@ createApp({
       volumeSeries.setData(klineData.map(d => ({
         time: d.time,
         value: d.volume,
-        color: d.close >= d.open ? 'rgba(239,83,80,0.3)' : 'rgba(38,166,154,0.3)'
+        color: d.close >= d.open ? 'rgba(248,81,73,0.3)' : 'rgba(63,185,80,0.3)'
       })));
 
       // 计算指标数据
@@ -267,8 +286,8 @@ createApp({
       if (!ma5Series) {
         // v5.0.6 API: addSeries(LineSeries, {...})
         ma5Series  = chart.addSeries(LightweightCharts.LineSeries, { color:'#f6c000', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
-        ma10Series = chart.addSeries(LightweightCharts.LineSeries, { color:'#e040fb', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
-        ma20Series = chart.addSeries(LightweightCharts.LineSeries, { color:'#00bcd4', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+        ma10Series = chart.addSeries(LightweightCharts.LineSeries, { color:'#a371f7', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+        ma20Series = chart.addSeries(LightweightCharts.LineSeries, { color:'#58a6ff', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
       }
       
       ma5Series.setData(klineData.map((d,i) => ({time:d.time, value:ma5[i]})));
@@ -300,13 +319,13 @@ createApp({
         
         macdDea = chart.addSeries(LightweightCharts.LineSeries, { 
           priceScaleId:'macd', 
-          color:'#e040fb', 
+          color:'#a371f7', 
           lineWidth:1, 
           lastValueVisible:false, 
           priceLineVisible:false 
         });
         
-        chart.priceScale('macd').applyOptions({ scaleMargins:{top:0.52,bottom:0.26} });
+        chart.priceScale('macd').applyOptions({ scaleMargins:{top:0.52,bottom:0.26}, borderColor:'#30363d' });
       }
       
       const { dif, dea, macd } = Indicators.MACD(closes, 12, 26, 9);
@@ -314,7 +333,7 @@ createApp({
       macdHist.setData(klineData.map((d,i) => ({
         time:d.time, 
         value:macd[i],
-        color: macd[i]>=0 ? 'rgba(239,83,80,0.5)' : 'rgba(38,166,154,0.5)'
+        color: macd[i]>=0 ? 'rgba(248,81,73,0.5)' : 'rgba(63,185,80,0.5)'
       })));
       
       macdDif.setData(klineData.map((d,i) => ({time:d.time, value:dif[i]})));
@@ -325,12 +344,12 @@ createApp({
       if (!rsiSeries) {
         rsiSeries = chart.addSeries(LightweightCharts.LineSeries, {
           priceScaleId: 'rsi',
-          color:'#ff9800', 
+          color:'#d29922', 
           lineWidth:1,
           lastValueVisible:false, 
           priceLineVisible:false,
         });
-        chart.priceScale('rsi').applyOptions({ scaleMargins:{top:0.78,bottom:0.02} });
+        chart.priceScale('rsi').applyOptions({ scaleMargins:{top:0.78,bottom:0.02}, borderColor:'#30363d' });
       }
       
       const rsi = Indicators.RSI(closes, 14);
@@ -408,26 +427,26 @@ createApp({
         });
         // PE面板 32%-47%
         if (fundSeries.pe) {
-          try { chart.priceScale('pe').applyOptions({ scaleMargins:{top:0.32,bottom:0.53} }); } catch(e){}
+          try { chart.priceScale('pe').applyOptions({scaleMargins:{top:0.32,bottom:0.53}, borderColor:'#30363d'}); } catch(e){}
         }
         // PB面板 49%-64%
         if (fundSeries.pb) {
-          try { chart.priceScale('pb').applyOptions({ scaleMargins:{top:0.49,bottom:0.36} }); } catch(e){}
+          try { chart.priceScale('pb').applyOptions({scaleMargins:{top:0.49,bottom:0.36}, borderColor:'#30363d'}); } catch(e){}
         }
         // ROE面板 66%-81%
         if (fundSeries.roe) {
-          try { chart.priceScale('roe').applyOptions({ scaleMargins:{top:0.66,bottom:0.19} }); } catch(e){}
+          try { chart.priceScale('roe').applyOptions({scaleMargins:{top:0.66,bottom:0.19}, borderColor:'#30363d'}); } catch(e){}
         }
         // 股息率面板 83%-98%
         if (fundSeries.dy) {
-          try { chart.priceScale('dy').applyOptions({ scaleMargins:{top:0.83,bottom:0.02} }); } catch(e){}
+          try { chart.priceScale('dy').applyOptions({scaleMargins:{top:0.83,bottom:0.02}, borderColor:'#30363d'}); } catch(e){}
         }
         // MACD/RSI压缩到最底部
         if (macdHist) {
-          try { chart.priceScale('macd').applyOptions({ scaleMargins:{top:0.90,bottom:0.95} }); } catch(e){}
+          try { chart.priceScale('macd').applyOptions({scaleMargins:{top:0.90,bottom:0.95}, borderColor:'#30363d'}); } catch(e){}
         }
         if (rsiSeries) {
-          try { chart.priceScale('rsi').applyOptions({ scaleMargins:{top:0.93,bottom:0.98} }); } catch(e){}
+          try { chart.priceScale('rsi').applyOptions({scaleMargins:{top:0.93,bottom:0.98}, borderColor:'#30363d'}); } catch(e){}
         }
       } else {
         // 基本面面板关闭：恢复默认布局
@@ -435,10 +454,10 @@ createApp({
           rightPriceScale: { scaleMargins: {top:0, bottom:0.50} }
         });
         if (macdHist) {
-          try { chart.priceScale('macd').applyOptions({ scaleMargins:{top:0.52,bottom:0.26} }); } catch(e){}
+          try { chart.priceScale('macd').applyOptions({scaleMargins:{top:0.52,bottom:0.26}, borderColor:'#30363d'}); } catch(e){}
         }
         if (rsiSeries) {
-          try { chart.priceScale('rsi').applyOptions({ scaleMargins:{top:0.78,bottom:0.02} }); } catch(e){}
+          try { chart.priceScale('rsi').applyOptions({scaleMargins:{top:0.78,bottom:0.02}, borderColor:'#30363d'}); } catch(e){}
         }
       }
     }
@@ -463,7 +482,7 @@ createApp({
         fundSeries.pe.setData(h.map(x=>({time:x.date, value:x.pe_ttm})).filter(d=>d.value));
         chart.priceScale('pe').applyOptions({
           scaleMargins: {top:0.32, bottom:0.53},
-          borderColor: '#d0d0d0'
+          borderColor: '#30363d'
         });
         console.log('[createFundPanelSeries] PE面板已创建');
         
@@ -478,7 +497,7 @@ createApp({
         fundSeries.pb.setData(h.map(x=>({time:x.date, value:x.pb})).filter(d=>d.value));
         chart.priceScale('pb').applyOptions({
           scaleMargins: {top:0.49, bottom:0.36},
-          borderColor: '#d0d0d0'
+          borderColor: '#30363d'
         });
         console.log('[createFundPanelSeries] PB面板已创建');
         
@@ -493,7 +512,7 @@ createApp({
         fundSeries.roe.setData(h.map(x=>({time:x.date, value:x.roe})).filter(d=>d.value));
         chart.priceScale('roe').applyOptions({
           scaleMargins: {top:0.66, bottom:0.19},
-          borderColor: '#d0d0d0'
+          borderColor: '#30363d'
         });
         console.log('[createFundPanelSeries] ROE面板已创建');
         
@@ -508,7 +527,7 @@ createApp({
         fundSeries.dy.setData(h.map(x=>({time:x.date, value:x.dividend_yield})).filter(d=>d.value));
         chart.priceScale('dy').applyOptions({
           scaleMargins: {top:0.83, bottom:0.02},
-          borderColor: '#d0d0d0'
+          borderColor: '#30363d'
         });
         console.log('[createFundPanelSeries] 股息率面板已创建');
       } catch(e) {
@@ -716,13 +735,13 @@ createApp({
       const engine = new BacktestEngine();
       const result = engine.run(klineData, strategyFn, {
         capital: btCapital.value,
-        commission: 0.0003,
-        slippage: 0.001,
+        commission: btCommission.value,
+        slippage: btSlippage.value,
       });
 
       btResult.value = result;
 
-      // 渲染资金曲线
+      // 渲染资金曲线（深色主题）
       nextTick(() => {
         const el = document.getElementById('equity-chart');
         if (!el) return;
@@ -731,11 +750,13 @@ createApp({
         equityChart = LightweightCharts.createChart(el, {
           width: el.clientWidth, 
           height: 250,
-          layout:{background:{type:'solid',color:'#fff'},textColor:'#333'},
-          grid:{vertLines:{color:'#f0f0f0'},horzLines:{color:'#f0f0f0'}},
+          layout:{background:{type:'solid',color:'#161b22'},textColor:'#c9d1d9',fontSize:11},
+          grid:{vertLines:{color:'rgba(48,54,61,0.5)'},horzLines:{color:'rgba(48,54,61,0.5)'}},
+          rightPriceScale: { borderColor:'#30363d', textColor:'#c9d1d9' },
+          timeScale: { borderColor:'#30363d', textColor:'#c9d1d9', timeVisible:false }
         });
         
-        const s = equityChart.addSeries(LightweightCharts.LineSeries, { color:'#2563eb', lineWidth:2 });
+        const s = equityChart.addSeries(LightweightCharts.LineSeries, { color:'#58a6ff', lineWidth:2 });
         s.setData(result.equityCurve);
         equityChart.timeScale().fitContent();
       });
@@ -766,9 +787,9 @@ createApp({
       const pct = Math.round(rank / sorted.length * 100);
       const fitem = fundamentalList.value.find(f => f.key === key);
       if (fitem) { fitem.percentile = pct; }
-
+      
       nextTick(() => {
-        // 1. 渲染历史图表
+        // 1. 渲染历史图表（深色主题）
         const el = document.getElementById('fund-chart');
         if (!el) return;
         if (fundChart) { try { fundChart.remove(); } catch(e){} }
@@ -776,28 +797,30 @@ createApp({
         fundChart = LightweightCharts.createChart(el, {
           width:el.clientWidth, 
           height:300,
-          layout:{background:{type:'solid',color:'#fff'},textColor:'#333'},
-          grid:{vertLines:{color:'#f0f0f0'},horzLines:{color:'#f0f0f0'}},
+          layout:{background:{type:'solid',color:'#161b22'},textColor:'#c9d1d9',fontSize:11},
+          grid:{vertLines:{color:'rgba(48,54,61,0.5)'},horzLines:{color:'rgba(48,54,61,0.5)'}},
+          rightPriceScale: { borderColor:'#30363d', textColor:'#c9d1d9' },
+          timeScale: { borderColor:'#30363d', textColor:'#c9d1d9', timeVisible:false }
         });
         
-        const s = fundChart.addSeries(LightweightCharts.LineSeries, { color:'#16a34a', lineWidth:2 });
+        const s = fundChart.addSeries(LightweightCharts.LineSeries, { color:'#3fb950', lineWidth:2 });
         s.setData(history);
         fundChart.timeScale().fitContent();
 
         // 2. 分位数条形图
         const barEl = document.getElementById('fund-pct-bar');
         if (barEl) {
-          const color = pct <= 30 ? '#16a34a' : pct >= 70 ? '#dc2626' : '#ca8a04';
+          const color = pct <= 30 ? '#3fb950' : pct >= 70 ? '#f85149' : '#d29922';
           const label = pct <= 30 ? '低估' : pct >= 70 ? '高估' : '合理';
           barEl.innerHTML = `
-            <div style="font-size:13px;margin-bottom:6px;">当前分位数：<b>${pct}%</b> （${label}）</div>
-            <div style="background:#eee;border-radius:8px;height:18px;overflow:hidden;position:relative;">
-              <div style="background:#16a34a;width:30%;height:100%;position:absolute;left:0;"></div>
-              <div style="background:#ca8a04;width:40%;height:100%;position:absolute;left:30%;"></div>
-              <div style="background:#dc2626;width:30%;height:100%;position:absolute;left:70%;"></div>
+            <div style="font-size:13px;margin-bottom:6px;color:#c9d1d9;">当前分位数：<b>${pct}%</b> （${label}）</div>
+            <div style="background:#21262d;border-radius:8px;height:18px;overflow:hidden;position:relative;">
+              <div style="background:#3fb950;width:30%;height:100%;position:absolute;left:0;"></div>
+              <div style="background:#d29922;width:40%;height:100%;position:absolute;left:30%;"></div>
+              <div style="background:#f85149;width:30%;height:100%;position:absolute;left:70%;"></div>
               <div style="position:absolute;left:${pct}%;top:-3px;transform:translateX(-50%);font-size:20px;color:${color};">▼</div>
             </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;color:#888;margin-top:2px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#8b949e;margin-top:2px;">
               <span>0%</span><span>30%（低估区域）</span><span>70%（高估区域）</span><span>100%</span>
             </div>`;
         }
@@ -813,7 +836,7 @@ createApp({
           const labels = ['PE','PB','ROE','股息率'];
           
           // 绘制网格线
-          ctx.strokeStyle = '#ddd';
+          ctx.strokeStyle = '#30363d';
           ctx.beginPath();
           for (let i = 0; i < keys.length; i++) {
             const angle = (Math.PI * 2 * i / keys.length) - Math.PI / 2;
@@ -823,8 +846,8 @@ createApp({
           ctx.stroke();
           
           // 绘制数据区域
-          ctx.fillStyle = 'rgba(59,130,246,0.3)';
-          ctx.strokeStyle = '#3b82f6';
+          ctx.fillStyle = 'rgba(88,166,255,0.3)';
+          ctx.strokeStyle = '#58a6ff';
           ctx.beginPath();
           for (let i = 0; i < keys.length; i++) {
             const angle = (Math.PI * 2 * i / keys.length) - Math.PI / 2;
@@ -839,7 +862,7 @@ createApp({
           ctx.stroke();
           
           // 绘制标签
-          ctx.fillStyle = '#333';
+          ctx.fillStyle = '#c9d1d9';
           ctx.font = '12px sans-serif';
           ctx.textAlign = 'center';
           for (let i = 0; i < keys.length; i++) {
@@ -899,8 +922,6 @@ createApp({
       if (v >= 1e4) return (v/1e4).toFixed(2) + '万元';
       return v + '元';
     }
-
-    // =========== 生命周期 ===========
 
     // =========== 基本面数据可视化 ===========
     async function loadFundamentalHistory(code) {
@@ -972,30 +993,25 @@ createApp({
 
     function renderFundamentalCharts() {
       if (!fundHistory.value || !fundHistory.value.history || fundHistory.value.history.length === 0) return;
-
       nextTick(() => {
         const history = fundHistory.value.history;
         const current = fundHistory.value.current || {};
 
-        // ====== 1. PE(TTM) 独立图表 ======
+        // ====== 1. PE(TTM) 独立图表（深色主题） ======
         const peEl = document.getElementById('pe-chart');
         if (peEl) {
           if (peChart) { peChart.remove(); peChart = null; }
           peChart = LightweightCharts.createChart(peEl, {
             width: peEl.clientWidth,
             height: 220,
-            layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
-            grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
-            rightPriceScale: { borderColor:'#d0d0d0' },
-            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{if(typeof time==='string'){const p=time.split('-');return parseInt(p[1])+'月';}const d=new Date(time*1000);return (d.getMonth()+1)+'月';}},
-            tickMarkFormatter: (time) => {
-              if (typeof time === 'string') {
-                const p = time.split('-');
-                return p[0] + '/' + parseInt(p[1]);
-              }
-              const d = new Date(time * 1000);
-              return d.getFullYear() + '/' + (d.getMonth() + 1);
-            },            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
+            layout: { background: { type:'solid', color:'#161b22' }, textColor:'#c9d1d9', fontSize:11 },
+            grid: { vertLines: { color:'rgba(48,54,61,0.5)' }, horzLines: { color:'rgba(48,54,61,0.5)' } },
+            rightPriceScale: { borderColor:'#30363d', textColor:'#c9d1d9' },
+            timeScale: { borderColor:'#30363d', textColor:'#c9d1d9', timeVisible:false, tickMarkFormatter:(time)=>{
+              if (typeof time==='string') { const p=time.split('-'); return parseInt(p[1])+'月'; }
+              const d=new Date(time*1000); return (d.getMonth()+1)+'月';
+            }},
+            crosshair: { vertLine:{color:'rgba(88,166,255,0.5)',width:1,style:2}, horzLine:{color:'rgba(88,166,255,0.5)',width:1,style:2} },
           });
           const peData = history.map(h => ({ time: h.date, value: h.pe_ttm || null })).filter(d => d.value);
           const peSeries = peChart.addSeries(LightweightCharts.LineSeries, {
@@ -1007,7 +1023,7 @@ createApp({
           if (current.pe_ttm) {
             peSeries.createPriceLine({
               price: current.pe_ttm,
-              color: current.pe_percentile<=30?'#16a34a':current.pe_percentile>=70?'#dc2626':'#ca8a04',
+              color: current.pe_percentile<=30?'#3fb950':current.pe_percentile>=70?'#f85149':'#d29922',
               lineWidth: 2,
               lineStyle: 2,
               axisLabelVisible: true,
@@ -1017,18 +1033,21 @@ createApp({
           peChart.timeScale().fitContent();
         }
 
-        // ====== 2. PB 独立图表 ======
+        // ====== 2. PB 独立图表（深色主题） ======
         const pbEl = document.getElementById('pb-chart');
         if (pbEl) {
           if (pbChart) { pbChart.remove(); pbChart = null; }
           pbChart = LightweightCharts.createChart(pbEl, {
             width: pbEl.clientWidth,
             height: 220,
-            layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
-            grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
-            rightPriceScale: { borderColor:'#d0d0d0' },
-            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{if(typeof time==='string'){const p=time.split('-');return parseInt(p[1])+'月';}const d=new Date(time*1000);return (d.getMonth()+1)+'月';}},
-            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
+            layout: { background: { type:'solid', color:'#161b22' }, textColor:'#c9d1d9', fontSize:11 },
+            grid: { vertLines: { color:'rgba(48,54,61,0.5)' }, horzLines: { color:'rgba(48,54,61,0.5)' } },
+            rightPriceScale: { borderColor:'#30363d', textColor:'#c9d1d9' },
+            timeScale: { borderColor:'#30363d', textColor:'#c9d1d9', timeVisible:false, tickMarkFormatter:(time)=>{
+              if (typeof time==='string') { const p=time.split('-'); return parseInt(p[1])+'月'; }
+              const d=new Date(time*1000); return (d.getMonth()+1)+'月';
+            }},
+            crosshair: { vertLine:{color:'rgba(88,166,255,0.5)',width:1,style:2}, horzLine:{color:'rgba(88,166,255,0.5)',width:1,style:2} },
           });
           const pbData = history.map(h => ({ time: h.date, value: h.pb || null })).filter(d => d.value);
           const pbSeries = pbChart.addSeries(LightweightCharts.LineSeries, {
@@ -1039,7 +1058,7 @@ createApp({
           if (current.pb) {
             pbSeries.createPriceLine({
               price: current.pb,
-              color: current.pb_percentile<=30?'#16a34a':current.pb_percentile>=70?'#dc2626':'#ca8a04',
+              color: current.pb_percentile<=30?'#3fb950':current.pb_percentile>=70?'#f85149':'#d29922',
               lineWidth: 2,
               lineStyle: 2,
               axisLabelVisible: true,
@@ -1049,18 +1068,21 @@ createApp({
           pbChart.timeScale().fitContent();
         }
 
-        // ====== 3. ROE 独立图表 ======
+        // ====== 3. ROE 独立图表（深色主题） ======
         const roeEl = document.getElementById('roe-chart');
         if (roeEl) {
           if (roeChart) { roeChart.remove(); roeChart = null; }
           roeChart = LightweightCharts.createChart(roeEl, {
             width: roeEl.clientWidth,
             height: 220,
-            layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
-            grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
-            rightPriceScale: { borderColor:'#d0d0d0' },
-            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{if(typeof time==='string'){const p=time.split('-');return parseInt(p[1])+'月';}const d=new Date(time*1000);return (d.getMonth()+1)+'月';}},
-            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
+            layout: { background: { type:'solid', color:'#161b22' }, textColor:'#c9d1d9', fontSize:11 },
+            grid: { vertLines: { color:'rgba(48,54,61,0.5)' }, horzLines: { color:'rgba(48,54,61,0.5)' } },
+            rightPriceScale: { borderColor:'#30363d', textColor:'#c9d1d9' },
+            timeScale: { borderColor:'#30363d', textColor:'#c9d1d9', timeVisible:false, tickMarkFormatter:(time)=>{
+              if (typeof time==='string') { const p=time.split('-'); return parseInt(p[1])+'月'; }
+              const d=new Date(time*1000); return (d.getMonth()+1)+'月';
+            }},
+            crosshair: { vertLine:{color:'rgba(88,166,255,0.5)',width:1,style:2}, horzLine:{color:'rgba(88,166,255,0.5)',width:1,style:2} },
           });
           const roeData = history.map(h => ({ time: h.date, value: h.roe || null })).filter(d => d.value);
           const roeSeries = roeChart.addSeries(LightweightCharts.LineSeries, {
@@ -1071,7 +1093,7 @@ createApp({
           if (current.roe) {
             roeSeries.createPriceLine({
               price: current.roe,
-              color: current.roe_percentile>=70?'#16a34a':current.roe_percentile<=30?'#dc2626':'#ca8a04',
+              color: current.roe_percentile>=70?'#3fb950':current.roe_percentile<=30?'#f85149':'#d29922',
               lineWidth: 2,
               lineStyle: 2,
               axisLabelVisible: true,
@@ -1081,18 +1103,21 @@ createApp({
           roeChart.timeScale().fitContent();
         }
 
-        // ====== 4. 股息率 独立图表 ======
+        // ====== 4. 股息率 独立图表（深色主题） ======
         const dyEl = document.getElementById('dy-chart');
         if (dyEl) {
           if (dyChart) { dyChart.remove(); dyChart = null; }
           dyChart = LightweightCharts.createChart(dyEl, {
             width: dyEl.clientWidth,
             height: 220,
-            layout: { background: { type:'solid', color:'#f8f9fa' }, textColor:'#333', fontSize:11 },
-            grid: { vertLines: { color:'#e8e8e8' }, horzLines: { color:'#e8e8e8' } },
-            rightPriceScale: { borderColor:'#d0d0d0' },
-            timeScale: { borderColor:'#d0d0d0', timeVisible:false, tickMarkFormatter:(time)=>{if(typeof time==='string'){const p=time.split('-');return parseInt(p[1])+'月';}const d=new Date(time*1000);return (d.getMonth()+1)+'月';}},
-            crosshair: { vertLine:{color:'#888',width:1,style:2}, horzLine:{color:'#888',width:1,style:2} },
+            layout: { background: { type:'solid', color:'#161b22' }, textColor:'#c9d1d9', fontSize:11 },
+            grid: { vertLines: { color:'rgba(48,54,61,0.5)' }, horzLines: { color:'rgba(48,54,61,0.5)' } },
+            rightPriceScale: { borderColor:'#30363d', textColor:'#c9d1d9' },
+            timeScale: { borderColor:'#30363d', textColor:'#c9d1d9', timeVisible:false, tickMarkFormatter:(time)=>{
+              if (typeof time==='string') { const p=time.split('-'); return parseInt(p[1])+'月'; }
+              const d=new Date(time*1000); return (d.getMonth()+1)+'月';
+            }},
+            crosshair: { vertLine:{color:'rgba(88,166,255,0.5)',width:1,style:2}, horzLine:{color:'rgba(88,166,255,0.5)',width:1,style:2} },
           });
           const dyData = history.map(h => ({ time: h.date, value: h.dividend_yield || null })).filter(d => d.value);
           const dySeries = dyChart.addSeries(LightweightCharts.LineSeries, {
@@ -1103,7 +1128,7 @@ createApp({
           if (current.dividend_yield) {
             dySeries.createPriceLine({
               price: current.dividend_yield,
-              color: current.dividend_yield_percentile>=70?'#16a34a':current.dividend_yield_percentile<=30?'#dc2626':'#ca8a04',
+              color: current.dividend_yield_percentile>=70?'#3fb950':current.dividend_yield_percentile<=30?'#f85149':'#d29922',
               lineWidth: 2,
               lineStyle: 2,
               axisLabelVisible: true,
@@ -1127,22 +1152,22 @@ createApp({
         { key: 'roe', label: 'ROE', value: current.roe, pct: current.roe_percentile, color: '#26A69A' },
         { key: 'dy', label: '股息率', value: current.dividend_yield, pct: current.dividend_yield_percentile, color: '#FFA726' }
       ];
-      let html = '<div style=padding:10px;><h4 style=font-size:14px;margin-bottom:12px;color:#333;>历史分位数</h4>';
+      let html = '<div style="padding:10px;"><h4 style="font-size:14px;margin-bottom:12px;color:#c9d1d9;">历史分位数</h4>';
       for (const ind of indicators) {
         if (ind.value == null) continue;
         const pct = (ind.pct != null) ? ind.pct : 50;
-        const color = pct < 30 ? '#16a34a' : pct < 70 ? '#ca8a04' : '#dc2626';
-        const bgColor = pct < 30 ? '#f0fdf4' : pct < 70 ? '#fefce8' : '#fef2f2';
+        const color = pct < 30 ? '#3fb950' : pct < 70 ? '#d29922' : '#f85149';
+        const bgColor = pct < 30 ? '#0d2818' : pct < 70 ? '#2a2010' : '#2a1018';
         const valStr = typeof ind.value === 'number' ? ind.value.toFixed(2) : ind.value;
-        html += '<div style=margin-bottom:14px;padding:10px 12px;background:' + bgColor + ';border-radius:10px;border:1px solid ' + color + '22;>'
-          + '<div style=display:flex;justify-content:space-between;margin-bottom:6px;>'
-          + '<span style=font-size:13px;font-weight:600;color:#333;>' + ind.label + '</span>'
-          + '<span style=font-size:13px;color:' + color + ';font-weight:700;>' + valStr + ' (' + pct.toFixed(1) + '%)</span></div>'
-          + '<div style=height:10px;background:#e0e0e0;border-radius:5px;overflow:hidden;position:relative;>'
-          + '<div style=height:100%;width:' + pct + '%;background:linear-gradient(90deg,#16a34a,#ca8a04,#dc2626);border-radius:5px;transition:width 0.6s ease;></div>'
-          + '<div style=position:absolute;top:-2px;left:30%;width:2px;height:14px;background:rgba(0,0,0,0.12);border-radius:1px;></div>'
-          + '<div style=position:absolute;top:-2px;left:70%;width:2px;height:14px;background:rgba(0,0,0,0.12);border-radius:1px;></div></div>'
-          + '<div style=display:flex;justify-content:space-between;font-size:10px;color:#999;margin-top:3px;>'
+        html += '<div style="margin-bottom:14px;padding:10px 12px;background:' + bgColor + ';border-radius:10px;border:1px solid ' + color + '22;">'
+          + '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">'
+          + '<span style="font-size:13px;font-weight:600;color:#c9d1d9;">' + ind.label + '</span>'
+          + '<span style="font-size:13px;color:' + color + ';font-weight:700;">' + valStr + ' (' + pct.toFixed(1) + '%)</span></div>'
+          + '<div style="height:10px;background:#21262d;border-radius:5px;overflow:hidden;position:relative;">'
+          + '<div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#3fb950,#d29922,#f85149);border-radius:5px;transition:width 0.6s ease;"></div>'
+          + '<div style="position:absolute;top:-2px;left:30%;width:2px;height:14px;background:rgba(255,255,255,0.12);border-radius:1px;"></div>'
+          + '<div style="position:absolute;top:-2px;left:70%;width:2px;height:14px;background:rgba(255,255,255,0.12);border-radius:1px;"></div></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:10px;color:#8b949e;margin-top:3px;">'
           + '<span>低估<br>0-30%</span><span>合理<br>30-70%</span><span>高估<br>70-100%</span></div></div>';
       }
       html += '</div>';
@@ -1172,6 +1197,7 @@ createApp({
 
     return {
       stockCode, activeMainTab, quote, quoteSource, period, chartHeight,
+      isMobile, showAdvanced, btCommission, btSlippage,
       indicators, periods, mainTabs, useLogScale,
       btStrategy, btCapital, btParam, btResult,
       fundamentalList, fundHistory, activeFund, showFundPanel,
